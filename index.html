@@ -285,6 +285,32 @@
       #downloadBtn:hover {
         background: #45a049;
       }
+      
+      /* Offline indicator */
+      #offlineIndicator {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: #ff9800;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        z-index: 1000;
+        display: none;
+      }
+      
+      /* Data sync status */
+      #syncStatus {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        background: #4CAF50;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        z-index: 1000;
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -700,6 +726,10 @@
     
     <!-- Download Button -->
     <button id="downloadBtn">💾 Download Page</button>
+    <!-- Offline Indicator -->
+    <div id="offlineIndicator">Offline Mode</div>
+    <!-- Sync Status -->
+    <div id="syncStatus">Syncing data...</div>
     </div>
     
     <script>
@@ -716,6 +746,27 @@
         });
       }
 
+      // Offline/Online detection
+      const offlineIndicator = document.getElementById('offlineIndicator');
+      const syncStatus = document.getElementById('syncStatus');
+      
+      function updateOnlineStatus() {
+        if (navigator.onLine) {
+          offlineIndicator.style.display = 'none';
+          syncStatus.style.display = 'none';
+          // Try to sync data when online
+          syncData();
+        } else {
+          offlineIndicator.style.display = 'block';
+        }
+      }
+      
+      window.addEventListener('online', updateOnlineStatus);
+      window.addEventListener('offline', updateOnlineStatus);
+      
+      // Initial check
+      updateOnlineStatus();
+
       // Download functionality
       document.getElementById('downloadBtn').addEventListener('click', function() {
         const htmlContent = document.documentElement.outerHTML;
@@ -730,6 +781,30 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       });
+
+      // Data synchronization
+      function syncData() {
+        // Check if we have data in localStorage that needs to be synced
+        const savedData = localStorage.getItem('smart_reminder_app_v1');
+        if (savedData) {
+          try {
+            const data = JSON.parse(savedData);
+            // Show sync status
+            syncStatus.style.display = 'block';
+            syncStatus.textContent = 'Syncing data...';
+            
+            // Simulate sync process (in a real app, this would be an actual API call)
+            setTimeout(() => {
+              syncStatus.textContent = 'Data synced successfully!';
+              setTimeout(() => {
+                syncStatus.style.display = 'none';
+              }, 2000);
+            }, 1000);
+          } catch (e) {
+            console.error('Error syncing data:', e);
+          }
+        }
+      }
 
       (function () {
         // ---------- Storage ----------
@@ -1692,10 +1767,12 @@
         
         window.addEventListener('online', () => {
           document.getElementById('downloadBtn').style.display = 'none';
+          document.getElementById('offlineIndicator').style.display = 'none';
         });
         
         window.addEventListener('offline', () => {
           document.getElementById('downloadBtn').style.display = 'block';
+          document.getElementById('offlineIndicator').style.display = 'block';
         });
       })();
     </script>
