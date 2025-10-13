@@ -266,6 +266,25 @@
         color: #666;
         text-decoration: none;
       }
+      
+      /* Download button */
+      #downloadBtn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        z-index: 1000;
+        display: none;
+      }
+      
+      #downloadBtn:hover {
+        background: #45a049;
+      }
     </style>
   </head>
   <body>
@@ -678,6 +697,9 @@
         </a>
       </div>
     </div>
+    
+    <!-- Download Button -->
+    <button id="downloadBtn">💾 Download Page</button>
     </div>
     
     <script>
@@ -693,6 +715,21 @@
             });
         });
       }
+
+      // Download functionality
+      document.getElementById('downloadBtn').addEventListener('click', function() {
+        const htmlContent = document.documentElement.outerHTML;
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'smart-reminder-app.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
 
       (function () {
         // ---------- Storage ----------
@@ -1645,6 +1682,21 @@
         renderNotes();
         renderBudgets();
         renderChecklists();
+        
+        // Show download button when offline
+        window.addEventListener('load', () => {
+          if (!navigator.onLine) {
+            document.getElementById('downloadBtn').style.display = 'block';
+          }
+        });
+        
+        window.addEventListener('online', () => {
+          document.getElementById('downloadBtn').style.display = 'none';
+        });
+        
+        window.addEventListener('offline', () => {
+          document.getElementById('downloadBtn').style.display = 'block';
+        });
       })();
     </script>
   </body>
