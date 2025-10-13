@@ -1215,11 +1215,15 @@
           if(file){
             const reader = new FileReader();
             reader.onload = function(e){
-              noteObj.file = {
+              // Create a new object with file data to avoid issues with localStorage
+              const fileData = {
                 name: file.name,
                 type: file.type,
                 data: e.target.result
               };
+              
+              noteObj.file = fileData;
+              
               if(editingNoteIndex !== null){
                 appData.notes[editingNoteIndex] = noteObj;
                 editingNoteIndex = null;
