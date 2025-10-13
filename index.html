@@ -1213,9 +1213,12 @@
           };
 
           if(file){
+            // Create a new FileReader instance for each file
             const reader = new FileReader();
+            
+            // Handle successful file reading
             reader.onload = function(e){
-              // Create a new object with file data to avoid issues with localStorage
+              // Create a new file object with proper structure
               const fileData = {
                 name: file.name,
                 type: file.type,
@@ -1237,10 +1240,14 @@
               byId('tableFormatCheckbox').checked = false;
               byId('saveNoteBtn').textContent = 'Save';
             };
+            
+            // Handle file reading errors
             reader.onerror = function() {
               alert('Error reading file. Please try again.');
               fileInput.value = '';
             };
+            
+            // Read file as Data URL
             reader.readAsDataURL(file);
           } else {
             if(editingNoteIndex !== null){
