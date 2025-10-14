@@ -566,7 +566,7 @@
               Title<input
                 id="checkTitle"
                 type="text"
-                placeholder="Checklist title"
+                placeholder="Checklist title (e.g., 'Plan a family road trip')"
               />
             </label>
             <label>
@@ -575,7 +575,13 @@
                 <option value="closed">Closed</option>
               </select>
             </label>
-            <label>
+            
+            <!-- GEMINI API BUTTON -->
+            <button id="generateChecklistBtn" class="primary" style="background:#5D5DE3; margin-top: 5px;">
+              ✨ Generate Checklist Items
+            </button>
+
+            <label style="margin-top: 8px;">
               Items (one per line)<textarea
                 id="checkItems"
                 rows="4"
@@ -620,7 +626,7 @@
 
         <!-- Custom Category Toggles -->
         <div class="notif-setting-item">
-          <span>⏰ Reminder Notifications Permission</span>
+          <span>⏰ Reminder Notifications (Daily)</span>
           <label class="toggle-switch">
             <input type="checkbox" id="toggleReminders" />
             <span class="slider"></span>
@@ -628,7 +634,7 @@
         </div>
 
         <div class="notif-setting-item">
-          <span>📝 Notes Notification Permision</span>
+          <span>📝 Notes Backup/Sync (Future Feature)</span>
           <label class="toggle-switch">
             <input type="checkbox" id="toggleNotes" />
             <span class="slider"></span>
@@ -636,7 +642,7 @@
         </div>
 
         <div class="notif-setting-item">
-          <span>✒ Checklist Notification permission</span>
+          <span>✒ Checklist (Open Task Reminders)</span>
           <label class="toggle-switch">
             <input type="checkbox" id="toggleChecklist" />
             <span class="slider"></span>
@@ -644,7 +650,7 @@
         </div>
 
         <div class="notif-setting-item">
-          <span>💰 Budget Tracker Notification Permission</span>
+          <span>💰 Budget Tracker (Daily Cost Reminder)</span>
           <label class="toggle-switch">
             <input type="checkbox" id="toggleBudget" />
             <span class="slider"></span>
@@ -827,6 +833,11 @@
       }
 
       (function () {
+        // ---------- Global Constants & API Setup ----------
+        const apiKey = ""; // API Key for Gemini
+        const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent";
+
+
         // ---------- Storage ----------
 
         // Enhanced storage with quota handling
@@ -860,6 +871,28 @@
         // ---------- Helpers ----------
         function byId(id){ return document.getElementById(id); }
         
+        // Exponential backoff helper for API calls
+        async function fetchWithExponentialBackoff(url, options, maxRetries = 5) {
+          for (let i = 0; i < maxRetries; i++) {
+            try {
+              const response = await fetch(url, options);
+              if (response.status === 429 && i < maxRetries - 1) { // Too Many Requests
+                const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+              }
+              if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
+              }
+              return response.json();
+            } catch (error) {
+              if (i === maxRetries - 1) throw error;
+              const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        }
+
         // Modified save function to use localStorage only
         async function saveAll() {
           try {
@@ -1244,8 +1277,6 @@
           container.appendChild(frag);
         }
         
-        // ... (Other functions like editBudget, deleteBudget, saveBudget, clearBudgetForm, editReminder, deleteReminder, saveReminder, clearReminderForm, deleteNote, editNote, saveNote, deleteCheck, editCheck, toggleCheckStatus, saveCheck are unchanged, omitted for brevity)
-        
         function editBudget(i){
           const b=appData.budget[i];
           editingBudgetIndex=i;
@@ -1257,7 +1288,7 @@
         }
 
         function deleteBudget(index){
-          if(!('Delete this budget?')) return;
+          if(!confirm('Delete this budget?')) return;
           appData.budget.splice(index, 1);
           saveAll();
           renderBudgets();
@@ -1293,7 +1324,7 @@
         }
 
         function deleteReminder(index){
-          if(!('Delete this reminder?')) return;
+          if(!confirm('Delete this reminder?')) return;
           appData.reminders.splice(index, 1);
           saveAll();
           renderReminders();
@@ -1318,7 +1349,7 @@
         }
         
         function deleteNote(index){
-          if(!('Delete this note?')) return;
+          if(!confirm('Delete this note?')) return;
           appData.notes.splice(index,1);
           saveAll();
           renderNotes();
@@ -1409,7 +1440,7 @@
         }
         
         function deleteCheck(index){
-          if(!('Delete this checklist?')) return;
+          if(!confirm('Delete this checklist?')) return;
           appData.checklists.splice(index,1);
           saveAll();
           renderChecklists();
@@ -1572,7 +1603,84 @@
 
         // ---------- End Unchanged Render Functions ----------
 
+        // ---------- NEW: Gemini LLM Feature - Generate Checklist Items ----------
 
+        async function generateChecklist() {
+            const titleInput = byId('checkTitle');
+            const itemsTextarea = byId('checkItems');
+            const generateBtn = byId('generateChecklistBtn');
+
+            const query = titleInput.value.trim();
+
+            if (!query) {
+                titleInput.focus();
+                // NOTE: Using console.error instead of alert as per instructions
+                console.error('Please enter a descriptive title for your checklist (e.g., "Plan a family road trip").');
+                return;
+            }
+
+            const originalBtnText = generateBtn.textContent;
+            generateBtn.textContent = '✨ Generating...';
+            generateBtn.disabled = true;
+            titleInput.disabled = true;
+            itemsTextarea.disabled = true;
+
+
+            const payload = {
+                contents: [{ parts: [{ text: `Generate a detailed, step-by-step checklist for the following task/project: ${query}` }] }],
+                systemInstruction: {
+                    parts: [{ text: "You are an expert project manager and planner. Your sole purpose is to take a high-level goal and break it down into a highly actionable, structured list of steps. Output ONLY a JSON array of strings, where each string is one checklist item." }]
+                },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "ARRAY",
+                        items: {
+                            type: "STRING"
+                        }
+                    }
+                }
+            };
+
+            try {
+                const result = await fetchWithExponentialBackoff(`${apiUrl}?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const jsonText = candidate.content.parts[0].text;
+                    const generatedItems = JSON.parse(jsonText);
+                    
+                    if (Array.isArray(generatedItems) && generatedItems.length > 0) {
+                        // Append new items to existing, separating by newline
+                        const currentItems = itemsTextarea.value.trim();
+                        const newContent = (currentItems ? currentItems + '\n' : '') + generatedItems.join('\n');
+                        itemsTextarea.value = newContent;
+                        itemsTextarea.focus();
+                    } else {
+                        console.warn("Gemini returned an empty or invalid item list. JSON received:", jsonText);
+                        // NOTE: Using console.error instead of alert
+                        console.error('Could not generate items. Please try a different title.');
+                    }
+                } else {
+                    throw new Error("Invalid response structure from API. Please check console for details.");
+                }
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                // NOTE: Using console.error instead of alert
+                console.error(`Error generating checklist. Ensure your internet connection is stable.`);
+            } finally {
+                generateBtn.textContent = originalBtnText;
+                generateBtn.disabled = false;
+                titleInput.disabled = false;
+                itemsTextarea.disabled = false;
+            }
+        }
+        
         // ---------- Form Show/Hide ----------
         function showForm(el){ el.classList.add('visible'); }
         function hideForm(el){ el.classList.remove('visible'); }
@@ -1783,8 +1891,8 @@
           
           // NOTES: (Future feature reminder)
           if(appData.notifNotes && currentHour === 18) { // Only notify for Notes in the Evening (6 PM)
-              new Notification("Notes Reminder", {
-                  body: "Check your important notes!",
+              new Notification("Notes Sync Reminder", {
+                  body: "Remember to review and backup your important notes!",
                   icon:'assets/icon.png'
               });
           }
@@ -1877,6 +1985,9 @@
         byId('viewCheckToggle').addEventListener('click', function() {
           toggleCollapse(byId('checkList'), byId('viewCheckToggle'));
         });
+        
+        // NEW GEMINI LISTENER
+        byId('generateChecklistBtn').addEventListener('click', generateChecklist);
 
         document.querySelectorAll('.menu-btn[data-page]').forEach(btn=>{
           btn.addEventListener('click',function() {
