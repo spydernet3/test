@@ -805,1184 +805,1260 @@
     </div>
     
     <script>
-      // Service Worker Registration - Fixed to prevent errors
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          // Only register if sw.js exists
-          fetch('/sw.js')
-            .then(response => {
-              if (response.ok) {
-                return navigator.serviceWorker.register('/sw.js')
-                  .then((registration) => {
-                    console.log('SW registered: ', registration);
-                  })
-                  .catch((error) => {
-                    console.log('SW registration failed: ', error);
-                  });
-              } else {
-                 console.log('Service worker file not found, skipping registration');
-              }
-            })
-            .catch(error => {
-              console.log('Service worker file fetch failed, skipping registration');
-            });
+  // Service Worker Registration - Fixed to prevent errors
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      // Only register if sw.js exists
+      fetch('/sw.js')
+        .then(response => {
+          if (response.ok) {
+            return navigator.serviceWorker.register('/sw.js')
+              .then((registration) => {
+                console.log('SW registered: ', registration);
+              })
+              .catch((error) => {
+                console.log('SW registration failed: ', error);
+              });
+          } else {
+             console.log('Service worker file not found, skipping registration');
+          }
+        })
+        .catch(error => {
+          console.log('Service worker file fetch failed, skipping registration');
+        });
+    });
+  }
+
+  (function () {
+    // ---------- Storage ----------
+    const STORAGE_KEY = 'smart_reminder_app_v1';
+    
+    const defaultData = {
+      reminders: [],
+      notes: [],
+      profileName: '',
+      profilePhoto: '',
+      darkMode: '0',
+      budget: [],
+      checklists: [],
+      notifReminders: true,
+      notifNotes: true,
+      notifChecklist: true,
+      notifBudget: true
+    };
+    
+    let appData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
+    // Merge with defaults to ensure new notif keys are present on load
+    appData = { ...defaultData, ...appData }; 
+
+    let editingIndex = null;
+    let editingBudgetIndex = null;
+    let editingCheckIndex = null;
+    let editingNoteIndex = null;
+
+    // ---------- Helpers ----------
+    function byId(id){ return document.getElementById(id); }
+    
+    // **FIX**: Added proper error handling for QuotaExceededError
+    async function saveAll() {
+      try {
+        const dataStr = JSON.stringify(appData);
+        localStorage.setItem(STORAGE_KEY, dataStr);
+        console.log("Data saved successfully to localStorage.");
+        // Re-render the notification page whenever data changes
+        renderNotificationPage(); 
+      } catch (err) {
+        console.error("Save failed:", err);
+        // Alert user if localStorage quota is exceeded
+        if (err.name === 'QuotaExceededError' || err.code === 22) { // Code 22 for Safari
+          alert("Storage is full. Maximum 500MB storage limit reached. Please delete some data (especially file attachments) to make space.");
+        } else {
+          alert("An error occurred while saving data. Check console for details.");
+        }
+      }
+    }
+    
+    function daysLeft(endDateStr){
+      if(!endDateStr) return null;
+      const [y,m,d] = endDateStr.split('-').map(Number);
+      const end = new Date(y,m-1,d);
+      const now = new Date();
+      const diffTime = end.setHours(0,0,0,0) - now.setHours(0,0,0,0);
+      return Math.floor(diffTime / (1000*60*60*24));
+    }
+
+    function formatDMY(dateStr){
+      if(!dateStr) return '';
+      const [y,m,d] = dateStr.split('-');
+      return `${d.toString().padStart(2,'0')}/${m.toString().padStart(2,'0')}/${y}`;
+    }
+
+    // Format date as DD-MMM-YYYY with IST time (12-hour format)
+    function formatDateDMYWithTime(date) {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+
+      // Get IST time (UTC+5:30) - NOTE: This relies on the system time being correctly set.
+      const istHours = date.getHours(); 
+      const istMinutes = date.getMinutes().toString().padStart(2, '0');
+      const ampm = istHours >= 12 ? 'PM' : 'AM';
+      const displayHours = istHours % 12 || 12;
+
+      return `${day}-${month}-${year} ${displayHours}:${istMinutes} ${ampm}`;
+    }
+
+    // Calculate days between two dates
+    function daysBetween(startDateStr, endDateStr) {
+      if (!startDateStr || !endDateStr) return 0;
+      const [startY, startM, startD] = startDateStr.split('-').map(Number);
+      const [endY, endM, endD] = endDateStr.split('-').map(Number);
+      const start = new Date(startY, startM-1, startD);
+      const end = new Date(endY, endM-1, endD);
+      const diffTime = end.setHours(0,0,0,0) - start.setHours(0,0,0,0);
+      return Math.floor(diffTime / (1000*60*60*24)) + 1; // +1 to include both start and end dates
+    }
+
+    // Calculate cost per day
+    function calculateCostPerDay(amount, startDate, endDate) {
+      const days = daysBetween(startDate, endDate);
+      if (days <= 0 || amount <= 0) return 0;
+      return (amount / days).toFixed(2);
+    }
+
+    // ---------- Render Functions ----------
+    
+    // Optimized render functions with minimal DOM operations
+    function renderReminders(){
+      const list = byId('reminderList'); 
+      list.innerHTML = '';
+      if(appData.reminders.length === 0){
+        const li = document.createElement('li'); 
+        li.textContent='No reminders yet.'; 
+        li.style.opacity='0.7'; 
+        list.appendChild(li);
+        renderHomeReminders(); 
+        renderHomeNotes(); 
+        renderHomeCheck(); 
+        return;
+      }
+      
+      const frag = document.createDocumentFragment();
+      appData.reminders.forEach((r,i)=>{
+        const li=document.createElement('li');
+        const left=document.createElement('div'); 
+        left.className='item-left';
+        const title=document.createElement('div'); 
+        title.textContent=r.title; 
+        title.style.fontWeight='600';
+        const dates=document.createElement('div'); 
+        dates.style.fontSize='13px'; 
+        dates.style.opacity='0.85'; 
+        dates.textContent=`Start: ${formatDMY(r.startDate)} | End: ${formatDMY(r.endDate)}`;
+        left.appendChild(title); 
+        left.appendChild(dates);
+
+        const right=document.createElement('div'); 
+        right.style.display='flex'; 
+        right.style.alignItems='center';
+        const badge=document.createElement('div'); 
+        badge.className='badge';
+        const diff = daysLeft(r.endDate);
+        if(diff === null){ 
+          badge.textContent='No date'; 
+        }
+        else if(diff < 0){ 
+          badge.textContent='Expired'; 
+        }
+        else if(diff === 0){ 
+          badge.textContent='Today'; 
+        }
+        else{ 
+          badge.textContent=`${diff} days left`; 
+        }
+
+        const editBtn=document.createElement('button'); 
+        editBtn.className='icon-small'; 
+        editBtn.textContent='✏️'; 
+        editBtn.title='Edit'; 
+        editBtn.addEventListener('click',()=>editReminder(i));
+        const delBtn=document.createElement('button'); 
+        delBtn.className='icon-small'; 
+        delBtn.textContent='🗑️'; 
+        delBtn.title='Delete'; 
+        delBtn.addEventListener('click',()=>deleteReminder(i));
+
+        right.appendChild(badge);
+        right.appendChild(editBtn);
+        right.appendChild(delBtn);
+        li.appendChild(left); 
+        li.appendChild(right); 
+        frag.appendChild(li);
+      });
+      list.appendChild(frag);
+      renderHomeReminders(); 
+      renderHomeNotes(); 
+      renderHomeCheck();
+    }
+
+    function renderHomeReminders(){
+      const container = byId('homeRemindersContainer');
+      container.innerHTML='';
+      // Filter reminders to show only today and 1 day left
+      const filteredReminders = appData.reminders.filter(r => {
+        const diff = daysLeft(r.endDate);
+        return diff === 0 || diff === 1;
+      });
+
+      if(filteredReminders.length === 0){
+        const li=document.createElement('li');
+        li.textContent='No reminders for today or tomorrow.';
+        li.style.opacity='0.7';
+        container.appendChild(li);
+        return;
+      }
+
+      const frag=document.createDocumentFragment();
+      filteredReminders.forEach(r=>{
+        const li=document.createElement('li');
+        const diff = daysLeft(r.endDate);
+        let badgeText='';
+        if(diff === null){ badgeText='No date'; }
+        else if(diff < 0){ badgeText='Expired'; }
+        else if(diff === 0){ badgeText='Today'; }
+        else{ badgeText=`${diff} days left`; }
+        li.textContent = `\"${r.title}\" || ${badgeText}`;
+        frag.appendChild(li);
+      });
+      container.appendChild(frag);
+    }
+
+    // Update renderHomeNotes function to handle table formatting
+    function renderHomeNotes(){
+      const container = byId('homeNotesContainer');
+      container.innerHTML = '';
+
+      if(appData.notes.length === 0){
+        const li = document.createElement('li');
+        li.textContent = 'No notes available.';
+        li.style.opacity = '0.7';
+        container.appendChild(li);
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+
+      appData.notes.forEach(n => {
+        const li = document.createElement('li');
+        li.className = 'list-item';
+
+        const left = document.createElement('div');
+        left.className = 'item-left';
+
+        // Show first line or table preview
+        if(n.isTable && n.text) {
+          const lines = n.text.split('\n').filter(line => line.trim() !== '' && !line.includes('Created:'));
+          let text = 'Table Note: ';
+          if(lines.length > 0) {
+             const firstLine = lines[0].replace(/\|/g, ' - ').trim(); // Preview the header/first row
+             text += firstLine.substring(0, 50) + (firstLine.length > 50 ? '...' : '');
+          }
+          const textEl = document.createElement('div');
+          textEl.innerHTML = `<b>${text}</b><br><small style="opacity:0.7">${n.createdAt || ''}</small>`;
+          left.appendChild(textEl);
+          
+        } else {
+          // Standard note preview
+          const noteText = n.text || '';
+          const firstLine = noteText.split('\n')[0].substring(0, 100);
+          const textEl = document.createElement('div');
+          textEl.innerHTML = `<b>${firstLine} ...</b><br><small style="opacity:0.7">${n.createdAt || ''}</small>`;
+          left.appendChild(textEl);
+        }
+
+        // ✅ Add image thumbnail if note has image (use loop variable `n`)
+        if (n.file && n.file.type && n.file.type.includes('image')) {
+          const thumb = document.createElement('img');
+          thumb.src = n.file.data;
+          thumb.style.maxWidth = '40px';
+          thumb.style.marginLeft = '5px';
+          thumb.style.borderRadius = '4px';
+          thumb.style.verticalAlign = 'middle';
+          thumb.alt = n.file.name || 'image';
+          left.appendChild(thumb);
+        }
+
+        li.appendChild(left);
+        frag.appendChild(li);
+      });
+
+      container.appendChild(frag);
+    }
+
+    // Update renderNotes function to handle table formatting
+    function renderNotes(){
+      const list = byId('noteList'); 
+      list.innerHTML='';
+      if(appData.notes.length===0){
+        const li=document.createElement('li');
+        li.textContent='No notes yet.'; 
+        li.style.opacity='0.7';
+        list.appendChild(li);
+        return;
+      }
+      const frag=document.createDocumentFragment();
+      appData.notes.forEach((note,i)=>{
+        const li=document.createElement('li');
+        const left=document.createElement('div'); 
+        left.className='item-left';
+
+        const text=document.createElement('div');
+        if(note.isTable && note.text) {
+          // Convert table format to HTML table
+          const lines = note.text.split('\n');
+          let tableHTML = '<table border="1" style="border-collapse: collapse; width: 100%; font-size: 13px;">';
+          let inHeader = true; // Assume the first non-date line is the header
+
+          lines.forEach((line) => {
+            if(line.includes('Created:')) {
+                // Skip date line in table rendering (already displayed below)
+                return;
+            }
+            if(line.includes('---')) {
+              // Row separator - add closing tags for previous row
+              tableHTML += '</tr>';
+              inHeader = false; // Next line is regular data row
+              tableHTML += '<tr>';
+            } else if(line.includes('|')) {
+              // Table row
+              const cells = line.split('|').filter(cell => cell.trim() !== '');
+              cells.forEach(cell => {
+                const cellContent = cell.trim();
+                if(inHeader) {
+                  tableHTML += `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${cellContent}</th>`;
+                } else {
+                  tableHTML += `<td style="border: 1px solid #ddd; padding: 8px;">${cellContent}</td>`;
+                }
+              });
+            }
+          });
+
+          tableHTML += '</tr></table>';
+          text.innerHTML = tableHTML;
+        } else {
+          // Display simple text note
+          text.innerHTML=`<b>${note.text||''}</b>`;
+        }
+        left.appendChild(text);
+
+        // Display Creation Date
+        const dateEl = document.createElement('div');
+        dateEl.innerHTML = `<small style="opacity:0.7">${note.createdAt||''}</small>`;
+        left.appendChild(dateEl);
+
+        // --- file rendering ---
+        if(note.file){
+          let fileEl;
+
+          // 📷 --- Image Support ---
+          if(note.file.type.includes('image')){
+            fileEl=document.createElement('img');
+            fileEl.src=note.file.data;
+            fileEl.style.maxWidth='200px';
+            fileEl.style.display='block';
+            fileEl.style.marginTop='5px';
+            fileEl.alt='Attached Image';
+          }
+          // 🎵 --- Audio Support ---
+          else if(note.file.type.includes('audio')){
+            fileEl=document.createElement('audio');
+            fileEl.controls=true;
+            fileEl.src=note.file.data;
+          }
+          // 🎬 --- Video Support ---
+          else if(note.file.type.includes('video')){
+            fileEl=document.createElement('video');
+            fileEl.controls=true;
+            fileEl.width=200;
+            fileEl.src=note.file.data;
+          }
+          // 📄 --- Docs (PDF/DOC) ---
+          else {
+            fileEl=document.createElement('a');
+            fileEl.href=note.file.data;
+            fileEl.download=note.file.name;
+            fileEl.textContent='📎 '+note.file.name;
+          }
+
+          left.appendChild(fileEl);
+        }
+
+        const right = document.createElement('div');
+        right.style.display = 'flex';
+        right.style.alignItems = 'center';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'icon-small';
+        editBtn.textContent = '✏️';
+        editBtn.title = 'Edit';
+        editBtn.addEventListener('click', () => editNote(i));
+
+        const delBtn=document.createElement('button');
+        delBtn.className='icon-small'; 
+        delBtn.textContent='🗑️';
+        delBtn.title='Delete';
+        delBtn.addEventListener('click',()=>{ deleteNote(i); });
+
+        right.appendChild(editBtn);
+        right.appendChild(delBtn);
+        li.appendChild(left); 
+        li.appendChild(right); 
+        frag.appendChild(li);
+      });
+      list.appendChild(frag);
+    }
+
+    // ---------- Budget Functions ----------
+    function renderBudgets(){
+      const list = byId('budgetList'); 
+      list.innerHTML = '';
+      // Ensure appData.budget exists and is an array
+      if (!appData.budget || !Array.isArray(appData.budget)) {
+        appData.budget = [];
+      }
+      if(appData.budget.length === 0){
+        const li = document.createElement('li'); 
+        li.textContent='No budgets yet.'; 
+        li.style.opacity='0.7'; 
+        list.appendChild(li);
+        renderHomeBudgets(); 
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      appData.budget.forEach((b,i)=>{
+        const li=document.createElement('li');
+        const left=document.createElement('div'); 
+        left.className='item-left';
+
+        // Calculate cost per day
+        const costPerDay = calculateCostPerDay(b.amount, b.startDate, b.endDate);
+        const days = daysBetween(b.startDate, b.endDate);
+
+        const title=document.createElement('div');
+        title.textContent=`Title: ${b.title}`;
+        title.style.fontWeight='600';
+
+        const amounts=document.createElement('div');
+        amounts.style.fontSize='13px';
+        amounts.style.opacity='0.85';
+        amounts.textContent=`Total Budget: ₹${b.amount} | Remaining Days: ${days} | Cost per Day: ₹${costPerDay}`;
+
+        left.appendChild(title); 
+        left.appendChild(amounts);
+
+        const right=document.createElement('div'); 
+        right.style.display='flex'; 
+        right.style.alignItems='center';
+        const editBtn=document.createElement('button'); 
+        editBtn.className='icon-small'; 
+        editBtn.textContent='✏️'; 
+        editBtn.title='Edit'; 
+        editBtn.addEventListener('click',()=>editBudget(i));
+        const delBtn=document.createElement('button'); 
+        delBtn.className='icon-small'; 
+        delBtn.textContent='🗑️'; 
+        delBtn.title='Delete'; 
+        delBtn.addEventListener('click',()=>deleteBudget(i));
+
+        right.appendChild(editBtn); 
+        right.appendChild(delBtn);
+        li.appendChild(left); 
+        li.appendChild(right); 
+        frag.appendChild(li);
+      });
+      list.appendChild(frag);
+      renderHomeBudgets();
+    }
+
+    function renderHomeBudgets(){
+      const container = byId('homeBudgetsContainer');
+      container.innerHTML='';
+      // Ensure appData.budget exists and is an array
+      if (!appData.budget || !Array.isArray(appData.budget)) {
+        appData.budget = [];
+      }
+      if(appData.budget.length === 0){
+        const li=document.createElement('li');
+        li.textContent='No budgets yet.';
+        li.style.opacity='0.7';
+        container.appendChild(li);
+        return;
+      }
+      const frag=document.createDocumentFragment();
+      appData.budget.forEach(b=>{
+        // Calculate cost per day
+        const costPerDay = calculateCostPerDay(b.amount, b.startDate, b.endDate);
+        const days = daysBetween(b.startDate, b.endDate);
+
+        const li=document.createElement('li');
+        li.textContent = `\"${b.title}\" || Total: ₹${b.amount} || Remaining: ${days} days || Cost: ₹${costPerDay}/day`;
+        frag.appendChild(li);
+      });
+      container.appendChild(frag);
+    }
+    
+    function editBudget(i){
+      const b=appData.budget[i];
+      editingBudgetIndex=i;
+      byId('budgetTitle').value=b.title;
+      byId('budgetAmount').value=b.amount;
+      byId('budgetStartDate').value=b.startDate||'';
+      byId('budgetEndDate').value=b.endDate||'';
+      byId('saveBudgetBtn').textContent = 'Update';
+      showForm(byId('budgetFormContainer'));
+    }
+
+    // **FIX**: Added proper confirmation dialog
+    function deleteBudget(index){
+      if(!confirm('Delete this budget?')) return;
+      appData.budget.splice(index, 1);
+      saveAll();
+      renderBudgets();
+      renderHomeBudgets();
+    }
+
+    function saveBudget(){
+      const title=byId('budgetTitle').value.trim();
+      const amount=byId('budgetAmount').value;
+      const start=byId('budgetStartDate').value;
+      const end=byId('budgetEndDate').value;
+      if(!title || !amount){ alert('Title and amount required'); return; }
+      if (new Date(start) > new Date(end)) { alert('Start date cannot be after end date.'); return; }
+
+      const budgetObj={ title, amount, startDate:start, endDate:end };
+      if(editingBudgetIndex!==null){ appData.budget[editingBudgetIndex]=budgetObj; editingBudgetIndex=null; }
+      else{ appData.budget.push(budgetObj); }
+      
+      saveAll(); 
+      renderBudgets(); 
+      hideForm(byId('budgetFormContainer')); 
+      clearBudgetForm();
+      byId('saveBudgetBtn').textContent = 'Save';
+    }
+
+    function clearBudgetForm(){
+      byId('budgetTitle').value='';
+      byId('budgetAmount').value='';
+      byId('budgetStartDate').value='';
+      byId('budgetEndDate').value='';
+    }
+    
+    function editReminder(i){
+      const r=appData.reminders[i];
+      editingIndex=i;
+      byId('reminderTitle').value=r.title;
+      byId('startDate').value=r.startDate||'';
+      byId('endDate').value=r.endDate||'';
+      byId('saveReminderBtn').textContent = 'Update';
+      showForm(byId('reminderFormContainer'));
+    }
+
+    // **FIX**: Added proper confirmation dialog
+    function deleteReminder(index){
+      if(!confirm('Delete this reminder?')) return;
+      appData.reminders.splice(index, 1);
+      saveAll();
+      renderReminders();
+      renderHomeReminders();
+    }
+
+    function saveReminder(){
+      const title=byId('reminderTitle').value.trim();
+      const start=byId('startDate').value;
+      const end=byId('endDate').value;
+      if(!title){ alert('Title required'); return; }
+      if (start && end && new Date(start) > new Date(end)) { alert('Start date cannot be after end date.'); return; }
+
+      const reminderObj={ title, startDate:start, endDate:end };
+      if(editingIndex!==null){ appData.reminders[editingIndex]=reminderObj; editingIndex=null; }
+      else{ appData.reminders.push(reminderObj); }
+      
+      saveAll(); 
+      renderReminders(); 
+      hideForm(byId('reminderFormContainer')); 
+      clearReminderForm();
+      byId('saveReminderBtn').textContent = 'Save';
+    }
+
+    function clearReminderForm(){
+      byId('reminderTitle').value='';
+      byId('startDate').value='';
+      byId('endDate').value='';
+    }
+    
+    // **FIX**: Added proper confirmation dialog
+    function deleteNote(index){
+      if(!confirm('Delete this note?')) return;
+      appData.notes.splice(index,1);
+      saveAll();
+      renderNotes();
+      renderHomeNotes();
+    }
+
+    function editNote(index){
+      const note = appData.notes[index];
+      editingNoteIndex = index;
+      
+      // **FIX**: Remove the 'Created:' date line from the textarea when editing a table note
+      let noteTextForEdit = note.text || '';
+      if(note.isTable && noteTextForEdit.includes('Created:')) {
+         noteTextForEdit = noteTextForEdit.split('\n').slice(2).join('\n').trim();
+      }
+
+      byId('noteText').value = noteTextForEdit;
+      byId('tableFormatCheckbox').checked = note.isTable || false;
+      byId('noteFile').value = ''; // Reset file input to prevent accidental resave of old file
+
+      // Show the form
+      showForm(byId('noteFormContainer'));
+
+      // Set the save button to update instead of create
+      byId('saveNoteBtn').textContent = 'Update';
+    }
+
+    function saveNote(){
+      const text = byId('noteText').value.trim();
+      const fileInput = byId('noteFile');
+      const file = fileInput.files[0];
+      const isTableFormat = byId('tableFormatCheckbox').checked;
+
+      // If editing, use the existing file unless a new one is uploaded
+      const existingFile = editingNoteIndex !== null ? appData.notes[editingNoteIndex].file : null;
+
+      if(!text && !file && !existingFile){
+        alert('Note cannot be empty (text or file required)');
+        return;
+      }
+
+      // Format date for all notes
+      const noteDate = formatDateDMYWithTime(new Date());
+
+      let noteText = text;
+      if (isTableFormat && text) {
+        // Add date/time to the beginning of the table
+        noteText = `Created: ${noteDate}\n\n${text}`;
+      }
+
+      const noteObj = {
+        text: noteText,
+        createdAt: noteDate,
+        file: existingFile, // Use existing file by default
+        isTable: isTableFormat
+      };
+
+      if(file){
+        const reader = new FileReader();
+        reader.onload = function(e){
+          noteObj.file = {
+            name: file.name,
+            type: file.type,
+            data: e.target.result
+          };
+          
+          if(editingNoteIndex !== null){
+            appData.notes[editingNoteIndex] = noteObj;
+            editingNoteIndex = null;
+          } else {
+            appData.notes.push(noteObj);
+          }
+          
+          // After save, reset form and render
+          saveAll(); 
+          renderNotes(); 
+          renderHomeNotes();
+          hideForm(byId('noteFormContainer'));
+          byId('noteText').value='';
+          fileInput.value='';
+          byId('tableFormatCheckbox').checked = false;
+          byId('saveNoteBtn').textContent = 'Save';
+        };
+        reader.onerror = function() {
+          console.error('Error reading file. Please try again.');
+          fileInput.value = '';
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // No new file, save with existing file (if editing) or no file (if creating)
+        if(editingNoteIndex !== null){
+          appData.notes[editingNoteIndex] = noteObj;
+          editingNoteIndex = null;
+        } else {
+          appData.notes.push(noteObj);
+        }
+        saveAll(); 
+        renderNotes(); 
+        renderHomeNotes();
+        hideForm(byId('noteFormContainer'));
+        byId('noteText').value='';
+        fileInput.value='';
+        byId('tableFormatCheckbox').checked = false;
+        byId('saveNoteBtn').textContent = 'Save';
+      }
+    }
+    
+    // **FIX**: Added proper confirmation dialog
+    function deleteCheck(index){
+      if(!confirm('Delete this checklist?')) return;
+      appData.checklists.splice(index,1);
+      saveAll();
+      renderChecklists();
+      renderHomeCheck();
+    }
+
+    function editCheck(index){
+      const check = appData.checklists[index];
+      editingCheckIndex = index;
+
+      byId('checkTitle').value = check.title || '';
+      byId('checkStatus').value = check.status || 'open';
+      byId('checkItems').value = check.items ? check.items.join('\n') : '';
+
+      // Show the form
+      showForm(byId('checkFormContainer'));
+
+      // Set the save button to update instead of create
+      byId('saveCheckBtn').textContent = 'Update';
+    }
+
+    function toggleCheckStatus(index) {
+      const check = appData.checklists[index];
+      check.status = check.status === 'open' ? 'closed' : 'open';
+      saveAll();
+      renderChecklists();
+      renderHomeCheck();
+    }
+    
+    function saveCheck(){
+      const title = byId('checkTitle').value.trim();
+      const status = byId('checkStatus').value;
+      const itemsText = byId('checkItems').value.trim();
+      const items = itemsText ? itemsText.split('\n').filter(item => item.trim() !== '') : [];
+
+      if(!title){
+        alert('Title required');
+        return;
+      }
+
+      const checkObj = {
+        title,
+        items,
+        status: status,
+        createdAt: formatDateDMYWithTime(new Date()) // Use DD-MMM-YYYY with IST time format
+      };
+
+      if(editingCheckIndex !== null){
+        appData.checklists[editingCheckIndex] = checkObj;
+        editingCheckIndex = null;
+      } else {
+        appData.checklists.push(checkObj);
+      }
+
+      saveAll();
+      renderChecklists();
+      renderHomeCheck();
+
+      hideForm(byId('checkFormContainer'));
+      byId('checkTitle').value = '';
+      byId('checkStatus').value = 'open';
+      byId('checkItems').value = '';
+      byId('saveCheckBtn').textContent = 'Save';
+    }
+
+
+    function renderHomeCheck(){
+      const container = byId('homeCheckContainer');
+      container.innerHTML = '';
+
+      // Ensure appData.checklists exists and is an array
+      if (!appData.checklists || !Array.isArray(appData.checklists)) {
+        appData.checklists = [];
+      }
+
+      const openChecks = appData.checklists.filter(c => c.status === 'open');
+
+      if(openChecks.length === 0){
+        const li = document.createElement('li');
+        li.textContent = 'No open checklists.';
+        li.style.opacity = '0.7';
+        container.appendChild(li);
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+
+      openChecks.forEach(check => {
+        const li = document.createElement('li');
+        li.textContent = `\"${check.title}\" - ${check.items.length} items`;
+        frag.appendChild(li);
+      });
+
+      container.appendChild(frag);
+    }
+    
+    function renderChecklists(){
+      const list = byId('checkList'); 
+      list.innerHTML = '';
+      // Ensure appData.checklists exists and is an array
+      if (!appData.checklists || !Array.isArray(appData.checklists)) {
+        appData.checklists = [];
+      }
+      if(appData.checklists.length === 0){
+        const li = document.createElement('li'); 
+        li.textContent='No checklists yet.'; 
+        li.style.opacity='0.7'; 
+        list.appendChild(li);
+        renderHomeCheck(); 
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      appData.checklists.forEach((check,i)=>{
+        const li=document.createElement('li');
+        const left=document.createElement('div'); 
+        left.className='item-left';
+
+        const title=document.createElement('div');
+        title.textContent=`${check.title}`;
+        title.style.fontWeight='600';
+
+        // START OF MODIFICATION: Display checklist items
+        const itemsPreview=document.createElement('div');
+        itemsPreview.style.fontSize='13px';
+        itemsPreview.style.opacity='0.9';
+
+        // Get the first 3 items or all items if less than 3
+        const previewItems = check.items.slice(0, 3);
+        let itemsText = previewItems.map(item => `\u2022 ${item}`).join('<br>'); // \u2022 is a bullet point
+
+        // Add an ellipsis if there are more than 3 items
+        if(check.items.length > 3) {
+            itemsText += '<br>... and ' + (check.items.length - 3) + ' more items';
+        } else if (check.items.length === 0) {
+            itemsText = 'No items in list.';
+        }
+
+        itemsPreview.innerHTML = itemsText;
+        // END OF MODIFICATION
+
+        const statusInfo=document.createElement('div');
+        statusInfo.style.fontSize='13px';
+        statusInfo.style.opacity='0.85';
+        statusInfo.textContent=`Status: ${check.status} | Total Items: ${check.items.length}`;
+
+        const time=document.createElement('div');
+        time.style.fontSize='12px';
+        time.style.opacity='0.7';
+        time.textContent=check.createdAt || '';
+
+        left.appendChild(title);
+        left.appendChild(itemsPreview); // Added the item preview
+        left.appendChild(statusInfo);
+        left.appendChild(time);
+
+        const right = document.createElement('div');
+        right.style.display = 'flex';
+        right.style.alignItems = 'center';
+
+        // Add status button
+        const statusBtn = document.createElement('button');
+        statusBtn.className = 'status-btn';
+        statusBtn.textContent = check.status === 'open' ? 'Open' : 'Closed';
+        statusBtn.title = 'Change Status';
+        statusBtn.style.backgroundColor = check.status === 'open' ? '#4CAF50' : '#f44336';
+        statusBtn.addEventListener('click', () => toggleCheckStatus(i));
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'icon-small';
+        editBtn.textContent = '✏️';
+        editBtn.title = 'Edit';
+        editBtn.addEventListener('click', () => editCheck(i));
+
+        const delBtn=document.createElement('button');
+        delBtn.className='icon-small'; 
+        delBtn.textContent='🗑️';
+        delBtn.title='Delete';
+        delBtn.addEventListener('click',()=>{ deleteCheck(i); });
+
+        right.appendChild(statusBtn);
+        right.appendChild(editBtn);
+        right.appendChild(delBtn);
+        li.appendChild(left); 
+        li.appendChild(right); 
+        frag.appendChild(li);
+      });
+      list.appendChild(frag);
+      renderHomeCheck();
+    }
+
+    // ---------- End Unchanged Render Functions ----------
+
+    // ---------- Form Show/Hide ----------
+    function showForm(el){ 
+      el.classList.add('visible'); 
+    }
+    function hideForm(el){ 
+      el.classList.remove('visible'); 
+    }
+
+    // ---------- Page Navigation ----------
+    const sidebar = byId('sidebar');
+    const main = byId('main');
+    const toggleBtn = byId('toggleBtn');
+
+    function showPage(pageId){
+      document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+      const targetPage = byId(pageId);
+      targetPage.classList.remove('hidden');
+
+      // Special handling for the notifications page
+      if (pageId === 'notifications') {
+        renderNotificationPage();
+      }
+
+      // Auto-hide sidebar instantly when an option is chosen
+      sidebar.style.left = '-220px';
+      main.style.marginLeft = '0';
+      toggleBtn.textContent = '⮞';
+    }
+
+    // ---------- Sidebar Toggle ----------
+    toggleBtn.addEventListener('click', function() {
+      if (sidebar.style.left === '-220px' || sidebar.style.left === '') {
+        sidebar.style.left = '0px';
+        main.style.marginLeft = '220px';
+        toggleBtn.textContent = '⮜';
+      } else {
+        sidebar.style.left = '-220px';
+        main.style.marginLeft = '0';
+        toggleBtn.textContent = '⮞';
+      }
+    });
+
+    // ---------- Settings Panel (new) ----------
+    const settingsBtn = byId('settingsBtn');
+    const settingsPanel = byId('settingsPanel');
+    if(settingsBtn && settingsPanel){
+      settingsBtn.addEventListener('click', ()=>{
+        const opened = settingsPanel.classList.toggle('visible');
+        settingsBtn.setAttribute('aria-expanded', opened);
+        settingsPanel.setAttribute('aria-hidden', !opened);
+      });
+    }
+
+    // ---------- Dark Mode ----------
+    const darkBtn=byId('darkModeBtn');
+    darkBtn.addEventListener('click',()=>{
+      document.body.classList.toggle('dark');
+      appData.darkMode=document.body.classList.contains('dark')?'1':'0';
+      saveAll();
+    });
+
+    // ---------- Profile ----------
+    const profileNameEl=byId('profileName');
+    byId('editNameBtn').addEventListener('click',()=>{
+      const n=prompt('Enter new name:',appData.profileName||'');
+      if(n){
+        appData.profileName=n;
+        profileNameEl.textContent=n;
+        saveAll();
+      }
+    });
+
+    const profilePhotoInput=byId('photoUpload');
+    profilePhotoInput.addEventListener('change',(e)=>{
+      const file=e.target.files[0];
+      if(file){
+        const reader=new FileReader();
+        reader.onload=function(ev){
+          appData.profilePhoto=ev.target.result;
+          byId('profilePhoto').src=ev.target.result;
+          saveAll();
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // ---------- NEW: Notification Settings Logic ----------
+    function updateBrowserPermissionUI() {
+        if (!(window.Notification)) {
+            byId('globalNotifStatus').innerHTML = '<h3>Browser Permission</h3><p style="color: #f44336;">Notifications are not supported by your browser.</p>';
+            return;
+        }
+
+        const status = Notification.permission;
+        const textEl = byId('browserPermissionText');
+        const boxEl = byId('globalNotifStatus');
+        const btnEl = byId('requestPermissionBtn');
+
+        boxEl.classList.remove('denied');
+
+        if (status === 'granted') {
+            textEl.innerHTML = 'Status: <b style="color: var(--accent);">Granted (ON)</b>';
+            btnEl.textContent = 'Permission Granted';
+            btnEl.disabled = true;
+        } else if (status === 'denied') {
+            textEl.innerHTML = 'Status: <b style="color: #f44336;">Denied (OFF)</b>. Please change in browser settings.';
+            btnEl.textContent = 'Permission Denied';
+            btnEl.disabled = true;
+            boxEl.classList.add('denied');
+        } else { // 'default' or not supported
+            textEl.innerHTML = 'Status: <b style="color: #ff9800;">Not Requested (OFF)</b>';
+            btnEl.textContent = 'Request Permission';
+            btnEl.disabled = false;
+        }
+    }
+
+    function requestNotificationPermission() {
+      if (!(window.Notification)) {
+          alert("This browser does not support desktop notification");
+          return;
+      }
+      if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+         updateBrowserPermissionUI();
+         return;
+      }
+
+      Notification.requestPermission().then(function(permission) {
+          updateBrowserPermissionUI();
+          if (permission === 'granted') {
+             // Immediately check for notifications if permission is granted
+             checkNotifications(true); 
+          }
+      });
+    }
+    
+    function renderNotificationPage() {
+        if (!(window.Notification)) {
+            byId('globalNotifStatus').innerHTML = '<h3>Browser Permission</h3><p style="color: #f44336;">Notifications are not supported by your browser.</p>';
+            return;
+        }
+
+        updateBrowserPermissionUI();
+
+        // Setup custom category toggles based on appData
+        byId('toggleReminders').checked = appData.notifReminders;
+        byId('toggleNotes').checked = appData.notifNotes;
+        byId('toggleChecklist').checked = appData.notifChecklist;
+        byId('toggleBudget').checked = appData.notifBudget;
+    }
+
+    // Function to handle custom toggle changes
+    function handleCustomNotifToggle(category, event) {
+        appData[category] = event.target.checked;
+        saveAll();
+        // Re-check notifications immediately if a new category is toggled on
+        if (event.target.checked) checkNotifications(true);
+    }
+
+    // **FIX**: Updated notifications logic to be less time-specific and rely on the interval
+    // ---------- Notifications Logic (Updated) ----------
+    function checkNotifications(force=false){
+      // 1. Check global browser permission first
+      if(!(window.Notification && Notification.permission === 'granted')) {
+         console.log("Global notification permission not granted. Skipping custom checks.");
+         return;
+      }
+
+      const now=new Date();
+      const notifTimes=[8,13,18]; // 8 AM, 1 PM, 6 PM
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
+      // Only proceed if it is one of the scheduled hours AND within the first 10 minutes of the hour (to ensure all 5-min intervals hit the window)
+      // or if force is true (e.g., after granting permission or toggling a setting)
+      const isNotificationTimeWindow = notifTimes.includes(currentHour) && currentMinute < 10;
+
+      if (!isNotificationTimeWindow && !force) return;
+      
+      // REMINDERS: Check if category is ON
+      if(appData.notifReminders) {
+        appData.reminders.forEach(r=>{
+          const diff=daysLeft(r.endDate);
+          if(diff===0||diff===1||diff<0){
+              new Notification("Reminder Alert!", {
+                body: `${r.title} - ${diff<0?'Expired':diff===0?'Today':'1 day left'}`,
+                icon:'assets/icon.png'
+              });
+          }
         });
       }
 
-      (function () {
-        // ---------- Storage ----------
-
-        // Enhanced storage with quota handling
-        const STORAGE_KEY = 'smart_reminder_app_v1';
-        
-        const defaultData = {
-          reminders: [],
-          notes: [],
-          profileName: '',
-          profilePhoto: '',
-          darkMode: '0',
-          budget: [],
-          checklists: [],
-          // NEW: Notification preferences
-          notifReminders: true,
-          notifNotes: true,
-          notifChecklist: true,
-          notifBudget: true
-        };
-        
-        let appData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
-        // Merge with defaults to ensure new notif keys are present on load
-        appData = { ...defaultData, ...appData }; 
-
-
-        let editingIndex = null;
-        let editingBudgetIndex = null;
-        let editingCheckIndex = null;
-        let editingNoteIndex = null;
-
-        // ---------- Helpers ----------
-        function byId(id){ return document.getElementById(id); }
-        
-        // **FIX**: Added proper error handling for QuotaExceededError
-        async function saveAll() {
-          try {
-            const dataStr = JSON.stringify(appData);
-            localStorage.setItem(STORAGE_KEY, dataStr);
-            console.log("Data saved successfully to localStorage.");
-            // Re-render the notification page whenever data changes
-            renderNotificationPage(); 
-          } catch (err) {
-            console.error("Save failed:", err);
-            // Alert user if localStorage quota is exceeded
-            if (err.name === 'QuotaExceededError' || err.code === 22) { // Code 22 for Safari
-              alert("Storage is full. Maximum 500MB storage limit reached. Please delete some data (especially file attachments) to make space.");
-            } else {
-              alert("An error occurred while saving data. Check console for details.");
-            }
-          }
-        }
-        
-        function daysLeft(endDateStr){
-          if(!endDateStr) return null;
-          const [y,m,d] = endDateStr.split('-').map(Number);
-          const end = new Date(y,m-1,d);
-          const now = new Date();
-          const diffTime = end.setHours(0,0,0,0) - now.setHours(0,0,0,0);
-          return Math.floor(diffTime / (1000*60*60*24));
-        }
-
-        function formatDMY(dateStr){
-          if(!dateStr) return '';
-          const [y,m,d] = dateStr.split('-');
-          return `${d.toString().padStart(2,'0')}/${m.toString().padStart(2,'0')}/${y}`;
-        }
-
-        // Format date as DD-MMM-YYYY with IST time (12-hour format)
-        function formatDateDMYWithTime(date) {
-          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          const day = date.getDate().toString().padStart(2, '0');
-          const month = months[date.getMonth()];
-          const year = date.getFullYear();
-
-          // Get IST time (UTC+5:30) - NOTE: This relies on the system time being correctly set.
-          const istHours = date.getHours(); 
-          const istMinutes = date.getMinutes().toString().padStart(2, '0');
-          const ampm = istHours >= 12 ? 'PM' : 'AM';
-          const displayHours = istHours % 12 || 12;
-
-          return `${day}-${month}-${year} ${displayHours}:${istMinutes} ${ampm}`;
-        }
-
-        // Calculate days between two dates
-        function daysBetween(startDateStr, endDateStr) {
-          if (!startDateStr || !endDateStr) return 0;
-          const [startY, startM, startD] = startDateStr.split('-').map(Number);
-          const [endY, endM, endD] = endDateStr.split('-').map(Number);
-          const start = new Date(startY, startM-1, startD);
-          const end = new Date(endY, endM-1, endD);
-          const diffTime = end.setHours(0,0,0,0) - start.setHours(0,0,0,0);
-          return Math.floor(diffTime / (1000*60*60*24)) + 1; // +1 to include both start and end dates
-        }
-
-        // Calculate cost per day
-        function calculateCostPerDay(amount, startDate, endDate) {
-          const days = daysBetween(startDate, endDate);
-          if (days <= 0 || amount <= 0) return 0;
-          return (amount / days).toFixed(2);
-        }
-
-        // ---------- Render Functions ----------
-        
-        function renderReminders(){
-          const list = byId('reminderList'); list.innerHTML = '';
-            if(appData.reminders.length === 0){
-            const li = document.createElement('li'); li.textContent='No reminders yet.'; li.style.opacity='0.7'; list.appendChild(li);
-            renderHomeReminders(); renderHomeNotes(); renderHomeCheck(); return;
-          }
-          const frag = document.createDocumentFragment();
-          appData.reminders.forEach((r,i)=>{
-            const li=document.createElement('li');
-            const left=document.createElement('div'); left.className='item-left';
-            const title=document.createElement('div'); title.textContent=r.title; title.style.fontWeight='600';
-            const dates=document.createElement('div'); dates.style.fontSize='13px'; dates.style.opacity='0.85'; dates.textContent=`Start: ${formatDMY(r.startDate)} | End: ${formatDMY(r.endDate)}`;
-            left.appendChild(title); left.appendChild(dates);
-
-            const right=document.createElement('div'); right.style.display='flex'; right.style.alignItems='center';
-            const badge=document.createElement('div'); badge.className='badge';
-            const diff = daysLeft(r.endDate);
-            if(diff === null){ badge.textContent='No date'; }
-            else if(diff < 0){ badge.textContent='Expired'; }
-            else if(diff === 0){ badge.textContent='Today'; }
-            else{ badge.textContent=`${diff} days left`; }
-
-            const editBtn=document.createElement('button'); editBtn.className='icon-small'; editBtn.textContent='✏️'; editBtn.title='Edit'; editBtn.addEventListener('click',()=>editReminder(i));
-            const delBtn=document.createElement('button'); delBtn.className='icon-small'; delBtn.textContent='🗑️'; delBtn.title='Delete'; delBtn.addEventListener('click',()=>deleteReminder(i));
-
-            right.appendChild(badge);
-            right.appendChild(editBtn);
-            right.appendChild(delBtn);
-            li.appendChild(left); li.appendChild(right); frag.appendChild(li);
-          });
-          list.appendChild(frag);
-          renderHomeReminders(); renderHomeNotes(); renderHomeCheck();
-        }
-
-        function renderHomeReminders(){
-          const container = byId('homeRemindersContainer');
-          container.innerHTML='';
-          // Filter reminders to show only today and 1 day left
-          const filteredReminders = appData.reminders.filter(r => {
-            const diff = daysLeft(r.endDate);
-            return diff === 0 || diff === 1;
-          });
-
-          if(filteredReminders.length === 0){
-            const li=document.createElement('li');
-            li.textContent='No reminders for today or tomorrow.';
-            li.style.opacity='0.7';
-            container.appendChild(li);
-            return;
-          }
-
-          const frag=document.createDocumentFragment();
-          filteredReminders.forEach(r=>{
-            const li=document.createElement('li');
-            const diff = daysLeft(r.endDate);
-            let badgeText='';
-            if(diff === null){ badgeText='No date'; }
-            else if(diff < 0){ badgeText='Expired'; }
-            else if(diff === 0){ badgeText='Today'; }
-            else{ badgeText=`${diff} days left`; }
-            li.textContent = `\"${r.title}\" || ${badgeText}`;
-            frag.appendChild(li);
-          });
-          container.appendChild(frag);
-        }
-
-        // Update renderHomeNotes function to handle table formatting
-        function renderHomeNotes(){
-          const container = byId('homeNotesContainer');
-          container.innerHTML = '';
-
-          if(appData.notes.length === 0){
-            const li = document.createElement('li');
-            li.textContent = 'No notes available.';
-            li.style.opacity = '0.7';
-            container.appendChild(li);
-            return;
-          }
-
-          const frag = document.createDocumentFragment();
-
-          appData.notes.forEach(n => {
-            const li = document.createElement('li');
-            li.className = 'list-item';
-
-            const left = document.createElement('div');
-            left.className = 'item-left';
-
-            // Show first line or table preview
-            if(n.isTable && n.text) {
-              const lines = n.text.split('\n').filter(line => line.trim() !== '' && !line.includes('Created:'));
-              let text = 'Table Note: ';
-              if(lines.length > 0) {
-                 const firstLine = lines[0].replace(/\|/g, ' - ').trim(); // Preview the header/first row
-                 text += firstLine.substring(0, 50) + (firstLine.length > 50 ? '...' : '');
-              }
-              const textEl = document.createElement('div');
-              textEl.innerHTML = `<b>${text}</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
-              left.appendChild(textEl);
-              
-            } else {
-              // Standard note preview
-              const noteText = n.text || '';
-              const firstLine = noteText.split('\n')[0].substring(0, 100);
-              const textEl = document.createElement('div');
-              textEl.innerHTML = `<b>${firstLine} ...</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
-              left.appendChild(textEl);
-            }
-
-            // ✅ Add image thumbnail if note has image (use loop variable `n`)
-            if (n.file && n.file.type && n.file.type.includes('image')) {
-              const thumb = document.createElement('img');
-              thumb.src = n.file.data;
-              thumb.style.maxWidth = '40px';
-              thumb.style.marginLeft = '5px';
-              thumb.style.borderRadius = '4px';
-              thumb.style.verticalAlign = 'middle';
-              thumb.alt = n.file.name || 'image';
-              left.appendChild(thumb);
-            }
-
-            li.appendChild(left);
-            frag.appendChild(li);
-          });
-
-          container.appendChild(frag);
-        }
-
-        // Update renderNotes function to handle table formatting
-        function renderNotes(){
-          const list = byId('noteList'); list.innerHTML='';
-          if(appData.notes.length===0){
-            const li=document.createElement('li');
-            li.textContent='No notes yet.'; li.style.opacity='0.7';
-            list.appendChild(li);
-            return;
-          }
-          const frag=document.createDocumentFragment();
-          appData.notes.forEach((note,i)=>{
-            const li=document.createElement('li');
-            const left=document.createElement('div'); left.className='item-left';
-
-            const text=document.createElement('div');
-            if(note.isTable && note.text) {
-              // Convert table format to HTML table
-              const lines = note.text.split('\n');
-              let tableHTML = '<table border=\"1\" style=\"border-collapse: collapse; width: 100%; font-size: 13px;\">';
-              let inHeader = true; // Assume the first non-date line is the header
-
-              lines.forEach((line) => {
-                if(line.includes('Created:')) {
-                    // Skip date line in table rendering (already displayed below)
-                    return;
-                }
-                if(line.includes('---')) {
-                  // Row separator - add closing tags for previous row
-                  tableHTML += '</tr>';
-                  inHeader = false; // Next line is regular data row
-                  tableHTML += '<tr>';
-                } else if(line.includes('|')) {
-                  // Table row
-                  const cells = line.split('|').filter(cell => cell.trim() !== '');
-                  cells.forEach(cell => {
-                    const cellContent = cell.trim();
-                    if(inHeader) {
-                      tableHTML += `<th style=\"border: 1px solid #ddd; padding: 8px; text-align: left;\">${cellContent}</th>`;
-                    } else {
-                      tableHTML += `<td style=\"border: 1px solid #ddd; padding: 8px;\">${cellContent}</td>`;
-                    }
-                  });
-                }
+      // CHECKLIST: Check if category is ON
+      if(appData.notifChecklist) {
+        const openChecks = appData.checklists.filter(c => c.status === 'open');
+        if (openChecks.length > 0) {
+             new Notification("Checklist Alert!", {
+                body: `You have ${openChecks.length} open checklist(s). Time to check them off!`,
+                icon:'assets/icon.png'
               });
-
-              tableHTML += '</tr></table>';
-              text.innerHTML = tableHTML;
-            } else {
-              // Display simple text note
-              text.innerHTML=`<b>${note.text||''}</b>`;
-            }
-            left.appendChild(text);
-
-            // Display Creation Date
-            const dateEl = document.createElement('div');
-            dateEl.innerHTML = `<small style=\"opacity:0.7\">${note.createdAt||''}</small>`;
-            left.appendChild(dateEl);
-
-            // --- file rendering ---
-            if(note.file){
-              let fileEl;
-
-              // 📷 --- Image Support ---
-              if(note.file.type.includes('image')){
-                fileEl=document.createElement('img');
-                fileEl.src=note.file.data;
-                fileEl.style.maxWidth='200px';
-                fileEl.style.display='block';
-                fileEl.style.marginTop='5px';
-                fileEl.alt='Attached Image';
-              }
-              // 🎵 --- Audio Support ---
-              else if(note.file.type.includes('audio')){
-                fileEl=document.createElement('audio');
-                fileEl.controls=true;
-                fileEl.src=note.file.data;
-              }
-              // 🎬 --- Video Support ---
-              else if(note.file.type.includes('video')){
-                fileEl=document.createElement('video');
-                fileEl.controls=true;
-                fileEl.width=200;
-                fileEl.src=note.file.data;
-              }
-              // 📄 --- Docs (PDF/DOC) ---
-              else {
-                fileEl=document.createElement('a');
-                fileEl.href=note.file.data;
-                fileEl.download=note.file.name;
-                fileEl.textContent='📎 '+note.file.name;
-              }
-
-              left.appendChild(fileEl);
-            }
-
-            const right = document.createElement('div');
-            right.style.display = 'flex';
-            right.style.alignItems = 'center';
-
-            const editBtn = document.createElement('button');
-            editBtn.className = 'icon-small';
-            editBtn.textContent = '✏️';
-            editBtn.title = 'Edit';
-            editBtn.addEventListener('click', () => editNote(i));
-
-            const delBtn=document.createElement('button');
-            delBtn.className='icon-small'; delBtn.textContent='🗑️';
-            delBtn.title='Delete';
-            delBtn.addEventListener('click',()=>{ deleteNote(i); });
-
-            right.appendChild(editBtn);
-            right.appendChild(delBtn);
-            li.appendChild(left); li.appendChild(right); frag.appendChild(li);
-          });
-          list.appendChild(frag);
         }
-
-        // ---------- Budget Functions ----------
-        function renderBudgets(){
-          const list = byId('budgetList'); list.innerHTML = '';
-          // Ensure appData.budget exists and is an array
-          if (!appData.budget || !Array.isArray(appData.budget)) {
-            appData.budget = [];
-          }
-          if(appData.budget.length === 0){
-            const li = document.createElement('li'); li.textContent='No budgets yet.'; li.style.opacity='0.7'; list.appendChild(li);
-            renderHomeBudgets(); return;
-          }
-          const frag = document.createDocumentFragment();
-          appData.budget.forEach((b,i)=>{
-            const li=document.createElement('li');
-            const left=document.createElement('div'); left.className='item-left';
-
-            // Calculate cost per day
-            const costPerDay = calculateCostPerDay(b.amount, b.startDate, b.endDate);
+      }
+      
+      // BUDGET: Check if category is ON
+      if(appData.notifBudget) {
+        appData.budget.forEach(b => {
             const days = daysBetween(b.startDate, b.endDate);
-
-            const title=document.createElement('div');
-            title.textContent=`Title: ${b.title}`;
-            title.style.fontWeight='600';
-
-            const amounts=document.createElement('div');
-            amounts.style.fontSize='13px';
-            amounts.style.opacity='0.85';
-            amounts.textContent=`Total Budget: ₹${b.amount} | Remaining Days: ${days} | Cost per Day: ₹${costPerDay}`;
-
-            left.appendChild(title); left.appendChild(amounts);
-
-            const right=document.createElement('div'); right.style.display='flex'; right.style.alignItems='center';
-            const editBtn=document.createElement('button'); editBtn.className='icon-small'; editBtn.textContent='✏️'; editBtn.title='Edit'; editBtn.addEventListener('click',()=>editBudget(i));
-            const delBtn=document.createElement('button'); delBtn.className='icon-small'; delBtn.textContent='🗑️'; delBtn.title='Delete'; delBtn.addEventListener('click',()=>deleteBudget(i));
-
-            right.appendChild(editBtn); right.appendChild(delBtn);
-            li.appendChild(left); li.appendChild(right); frag.appendChild(li);
-          });
-          list.appendChild(frag);
-          renderHomeBudgets();
-        }
-
-        function renderHomeBudgets(){
-          const container = byId('homeBudgetsContainer');
-          container.innerHTML='';
-          // Ensure appData.budget exists and is an array
-          if (!appData.budget || !Array.isArray(appData.budget)) {
-            appData.budget = [];
-          }
-          if(appData.budget.length === 0){
-            const li=document.createElement('li');
-            li.textContent='No budgets yet.';
-            li.style.opacity='0.7';
-            container.appendChild(li);
-            return;
-          }
-          const frag=document.createDocumentFragment();
-          appData.budget.forEach(b=>{
-            // Calculate cost per day
             const costPerDay = calculateCostPerDay(b.amount, b.startDate, b.endDate);
-            const days = daysBetween(b.startDate, b.endDate);
-
-            const li=document.createElement('li');
-            li.textContent = `\"${b.title}\" || Total: ₹${b.amount} || Remaining: ${days} days || Cost: ₹${costPerDay}/day`;
-            frag.appendChild(li);
-          });
-          container.appendChild(frag);
-        }
-        
-        function editBudget(i){
-          const b=appData.budget[i];
-          editingBudgetIndex=i;
-          byId('budgetTitle').value=b.title;
-          byId('budgetAmount').value=b.amount;
-          byId('budgetStartDate').value=b.startDate||'';
-          byId('budgetEndDate').value=b.endDate||'';
-          byId('saveBudgetBtn').textContent = 'Update';
-          showForm(byId('budgetFormContainer'));
-        }
-
-        // **FIX**: Added proper confirmation dialog
-        function deleteBudget(index){
-          if(!confirm('Delete this budget?')) return;
-          appData.budget.splice(index, 1);
-          saveAll();
-          renderBudgets();
-          renderHomeBudgets();
-        }
-
-        function saveBudget(){
-          const title=byId('budgetTitle').value.trim();
-          const amount=byId('budgetAmount').value;
-          const start=byId('budgetStartDate').value;
-          const end=byId('budgetEndDate').value;
-          if(!title || !amount){ alert('Title and amount required'); return; }
-          if (new Date(start) > new Date(end)) { alert('Start date cannot be after end date.'); return; }
-
-          const budgetObj={ title, amount, startDate:start, endDate:end };
-          if(editingBudgetIndex!==null){ appData.budget[editingBudgetIndex]=budgetObj; editingBudgetIndex=null; }
-          else{ appData.budget.push(budgetObj); }
-          
-          saveAll(); 
-          renderBudgets(); 
-          hideForm(byId('budgetFormContainer')); 
-          clearBudgetForm();
-          byId('saveBudgetBtn').textContent = 'Save';
-        }
-
-        function clearBudgetForm(){
-          byId('budgetTitle').value='';
-          byId('budgetAmount').value='';
-          byId('budgetStartDate').value='';
-          byId('budgetEndDate').value='';
-        }
-        
-        function editReminder(i){
-          const r=appData.reminders[i];
-          editingIndex=i;
-          byId('reminderTitle').value=r.title;
-          byId('startDate').value=r.startDate||'';
-          byId('endDate').value=r.endDate||'';
-          byId('saveReminderBtn').textContent = 'Update';
-          showForm(byId('reminderFormContainer'));
-        }
-
-        // **FIX**: Added proper confirmation dialog
-        function deleteReminder(index){
-          if(!confirm('Delete this reminder?')) return;
-          appData.reminders.splice(index, 1);
-          saveAll();
-          renderReminders();
-          renderHomeReminders();
-        }
-
-        function saveReminder(){
-          const title=byId('reminderTitle').value.trim();
-          const start=byId('startDate').value;
-          const end=byId('endDate').value;
-          if(!title){ alert('Title required'); return; }
-          if (start && end && new Date(start) > new Date(end)) { alert('Start date cannot be after end date.'); return; }
-
-          const reminderObj={ title, startDate:start, endDate:end };
-          if(editingIndex!==null){ appData.reminders[editingIndex]=reminderObj; editingIndex=null; }
-          else{ appData.reminders.push(reminderObj); }
-          
-          saveAll(); 
-          renderReminders(); 
-          hideForm(byId('reminderFormContainer')); 
-          clearReminderForm();
-          byId('saveReminderBtn').textContent = 'Save';
-        }
-
-        function clearReminderForm(){
-          byId('reminderTitle').value='';
-          byId('startDate').value='';
-          byId('endDate').value='';
-        }
-        
-        // **FIX**: Added proper confirmation dialog
-        function deleteNote(index){
-          if(!confirm('Delete this note?')) return;
-          appData.notes.splice(index,1);
-          saveAll();
-          renderNotes();
-          renderHomeNotes();
-        }
-
-        function editNote(index){
-          const note = appData.notes[index];
-          editingNoteIndex = index;
-          
-          // **FIX**: Remove the 'Created:' date line from the textarea when editing a table note
-          let noteTextForEdit = note.text || '';
-          if(note.isTable && noteTextForEdit.includes('Created:')) {
-             noteTextForEdit = noteTextForEdit.split('\n').slice(2).join('\n').trim();
-          }
-
-          byId('noteText').value = noteTextForEdit;
-          byId('tableFormatCheckbox').checked = note.isTable || false;
-          byId('noteFile').value = ''; // Reset file input to prevent accidental resave of old file
-
-          // Show the form
-          showForm(byId('noteFormContainer'));
-
-          // Set the save button to update instead of create
-          byId('saveNoteBtn').textContent = 'Update';
-        }
-
-        function saveNote(){
-          const text = byId('noteText').value.trim();
-          const fileInput = byId('noteFile');
-          const file = fileInput.files[0];
-          const isTableFormat = byId('tableFormatCheckbox').checked;
-
-          // If editing, use the existing file unless a new one is uploaded
-          const existingFile = editingNoteIndex !== null ? appData.notes[editingNoteIndex].file : null;
-
-          if(!text && !file && !existingFile){
-            alert('Note cannot be empty (text or file required)');
-            return;
-          }
-
-          // Format date for all notes
-          const noteDate = formatDateDMYWithTime(new Date());
-
-          let noteText = text;
-          if (isTableFormat && text) {
-            // Add date/time to the beginning of the table
-            noteText = `Created: ${noteDate}\n\n${text}`;
-          }
-
-          const noteObj = {
-            text: noteText,
-            createdAt: noteDate,
-            file: existingFile, // Use existing file by default
-            isTable: isTableFormat
-          };
-
-          if(file){
-            const reader = new FileReader();
-            reader.onload = function(e){
-              noteObj.file = {
-                name: file.name,
-                type: file.type,
-                data: e.target.result
-              };
-              
-              if(editingNoteIndex !== null){
-                appData.notes[editingNoteIndex] = noteObj;
-                editingNoteIndex = null;
-              } else {
-                appData.notes.push(noteObj);
-              }
-              
-              // After save, reset form and render
-              saveAll(); renderNotes(); renderHomeNotes();
-              hideForm(byId('noteFormContainer'));
-              byId('noteText').value='';
-              fileInput.value='';
-              byId('tableFormatCheckbox').checked = false;
-              byId('saveNoteBtn').textContent = 'Save';
-            };
-            reader.onerror = function() {
-              console.error('Error reading file. Please try again.');
-              fileInput.value = '';
-            };
-            reader.readAsDataURL(file);
-          } else {
-            // No new file, save with existing file (if editing) or no file (if creating)
-            if(editingNoteIndex !== null){
-              appData.notes[editingNoteIndex] = noteObj;
-              editingNoteIndex = null;
-            } else {
-              appData.notes.push(noteObj);
-            }
-            saveAll(); renderNotes(); renderHomeNotes();
-            hideForm(byId('noteFormContainer'));
-            byId('noteText').value='';
-            fileInput.value='';
-            byId('tableFormatCheckbox').checked = false;
-            byId('saveNoteBtn').textContent = 'Save';
-          }
-        }
-        
-        // **FIX**: Added proper confirmation dialog
-        function deleteCheck(index){
-          if(!confirm('Delete this checklist?')) return;
-          appData.checklists.splice(index,1);
-          saveAll();
-          renderChecklists();
-          renderHomeCheck();
-        }
-
-        function editCheck(index){
-          const check = appData.checklists[index];
-          editingCheckIndex = index;
-
-          byId('checkTitle').value = check.title || '';
-          byId('checkStatus').value = check.status || 'open';
-          byId('checkItems').value = check.items ? check.items.join('\n') : '';
-
-          // Show the form
-          showForm(byId('checkFormContainer'));
-
-          // Set the save button to update instead of create
-          byId('saveCheckBtn').textContent = 'Update';
-        }
-
-        function toggleCheckStatus(index) {
-          const check = appData.checklists[index];
-          check.status = check.status === 'open' ? 'closed' : 'open';
-          saveAll();
-          renderChecklists();
-          renderHomeCheck();
-        }
-        
-        function saveCheck(){
-          const title = byId('checkTitle').value.trim();
-          const status = byId('checkStatus').value;
-          const itemsText = byId('checkItems').value.trim();
-          const items = itemsText ? itemsText.split('\n').filter(item => item.trim() !== '') : [];
-
-          if(!title){
-            alert('Title required');
-            return;
-          }
-
-          const checkObj = {
-            title,
-            items,
-            status: status,
-            createdAt: formatDateDMYWithTime(new Date()) // Use DD-MMM-YYYY with IST time format
-          };
-
-          if(editingCheckIndex !== null){
-            appData.checklists[editingCheckIndex] = checkObj;
-            editingCheckIndex = null;
-          } else {
-            appData.checklists.push(checkObj);
-          }
-
-          saveAll();
-          renderChecklists();
-          renderHomeCheck();
-
-          hideForm(byId('checkFormContainer'));
-          byId('checkTitle').value = '';
-          byId('checkStatus').value = 'open';
-          byId('checkItems').value = '';
-          byId('saveCheckBtn').textContent = 'Save';
-        }
-
-
-        function renderHomeCheck(){
-          const container = byId('homeCheckContainer');
-          container.innerHTML = '';
-
-          // Ensure appData.checklists exists and is an array
-          if (!appData.checklists || !Array.isArray(appData.checklists)) {
-            appData.checklists = [];
-          }
-
-          const openChecks = appData.checklists.filter(c => c.status === 'open');
-
-          if(openChecks.length === 0){
-            const li = document.createElement('li');
-            li.textContent = 'No open checklists.';
-            li.style.opacity = '0.7';
-            container.appendChild(li);
-            return;
-          }
-
-          const frag = document.createDocumentFragment();
-
-          openChecks.forEach(check => {
-            const li = document.createElement('li');
-            li.textContent = `\"${check.title}\" - ${check.items.length} items`;
-            frag.appendChild(li);
-          });
-
-          container.appendChild(frag);
-        }
-        
-        function renderChecklists(){
-          const list = byId('checkList'); list.innerHTML = '';
-          // Ensure appData.checklists exists and is an array
-          if (!appData.checklists || !ArrayAray.isArray(appData.checklists)) {
-            appData.checklists = [];
-          }
-          if(appData.checklists.length === 0){
-            const li = document.createElement('li'); li.textContent='No checklists yet.'; li.style.opacity='0.7'; list.appendChild(li);
-            renderHomeCheck(); return;
-          }
-          const frag = document.createDocumentFragment();
-          appData.checklists.forEach((check,i)=>{
-            const li=document.createElement('li');
-            const left=document.createElement('div'); left.className='item-left';
-
-            const title=document.createElement('div');
-            title.textContent=`${check.title}`;
-            title.style.fontWeight='600';
-
-            // START OF MODIFICATION: Display checklist items
-            const itemsPreview=document.createElement('div');
-            itemsPreview.style.fontSize='13px';
-            itemsPreview.style.opacity='0.9';
-
-            // Get the first 3 items or all items if less than 3
-            const previewItems = check.items.slice(0, 3);
-            let itemsText = previewItems.map(item => `\u2022 ${item}`).join('<br>'); // \u2022 is a bullet point
-
-            // Add an ellipsis if there are more than 3 items
-            if(check.items.length > 3) {
-                itemsText += '<br>... and ' + (check.items.length - 3) + ' more items';
-            } else if (check.items.length === 0) {
-                itemsText = 'No items in list.';
-            }
-
-            itemsPreview.innerHTML = itemsText;
-            // END OF MODIFICATION
-
-            const statusInfo=document.createElement('div');
-            statusInfo.style.fontSize='13px';
-            statusInfo.style.opacity='0.85';
-            statusInfo.textContent=`Status: ${check.status} | Total Items: ${check.items.length}`;
-
-            const time=document.createElement('div');
-            time.style.fontSize='12px';
-            time.style.opacity='0.7';
-            time.textContent=check.createdAt || '';
-
-            left.appendChild(title);
-            left.appendChild(itemsPreview); // Added the item preview
-            left.appendChild(statusInfo);
-            left.appendChild(time);
-
-            const right = document.createElement('div');
-            right.style.display = 'flex';
-            right.style.alignItems = 'center';
-
-            // Add status button
-            const statusBtn = document.createElement('button');
-            statusBtn.className = 'status-btn';
-            statusBtn.textContent = check.status === 'open' ? 'Open' : 'Closed';
-            statusBtn.title = 'Change Status';
-            statusBtn.style.backgroundColor = check.status === 'open' ? '#4CAF50' : '#f44336';
-            statusBtn.addEventListener('click', () => toggleCheckStatus(i));
-
-            const editBtn = document.createElement('button');
-            editBtn.className = 'icon-small';
-            editBtn.textContent = '✏️';
-            editBtn.title = 'Edit';
-            editBtn.addEventListener('click', () => editCheck(i));
-
-            const delBtn=document.createElement('button');
-            delBtn.className='icon-small'; delBtn.textContent='🗑️';
-            delBtn.title='Delete';
-            delBtn.addEventListener('click',()=>{ deleteCheck(i); });
-
-            right.appendChild(statusBtn);
-            right.appendChild(editBtn);
-            right.appendChild(delBtn);
-            li.appendChild(left); li.appendChild(right); frag.appendChild(li);
-          });
-          list.appendChild(frag);
-          renderHomeCheck();
-        }
-
-        // ---------- End Unchanged Render Functions ----------
-
-
-        // ---------- Form Show/Hide ----------
-        function showForm(el){ el.classList.add('visible'); }
-        function hideForm(el){ el.classList.remove('visible'); }
-
-        // ---------- Page Navigation ----------
-        const sidebar = byId('sidebar');
-        const main = byId('main');
-        const toggleBtn = byId('toggleBtn');
-
-        function showPage(pageId){
-          document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
-          const targetPage = byId(pageId);
-          targetPage.classList.remove('hidden');
-
-          // Special handling for the notifications page
-          if (pageId === 'notifications') {
-            renderNotificationPage();
-          }
-
-          // Auto-hide sidebar instantly when an option is chosen
-          sidebar.style.left = '-220px';
-          main.style.marginLeft = '0';
-          toggleBtn.textContent = '⮞';
-          // **FIX**: Removed 'transition: left 0s;' from JS to allow CSS transitions if needed, but keeping the instant effect by just changing properties.
-        }
-
-        // ---------- Sidebar Toggle ----------
-        toggleBtn.addEventListener('click', function() {
-          if (sidebar.style.left === '-220px' || sidebar.style.left === '') {
-            sidebar.style.left = '0px';
-            main.style.marginLeft = '220px';
-            toggleBtn.textContent = '⮜';
-          } else {
-            sidebar.style.left = '-220px';
-            main.style.marginLeft = '0';
-            toggleBtn.textContent = '⮞';
-          }
-        });
-
-        // ---------- Settings Panel (new) ----------
-        const settingsBtn = byId('settingsBtn');
-        const settingsPanel = byId('settingsPanel');
-        if(settingsBtn && settingsPanel){
-          settingsBtn.addEventListener('click', ()=>{
-            const opened = settingsPanel.classList.toggle('visible');
-            settingsBtn.setAttribute('aria-expanded', opened);
-            settingsPanel.setAttribute('aria-hidden', !opened);
-          });
-        }
-
-        // ---------- Dark Mode ----------
-        const darkBtn=byId('darkModeBtn');
-        darkBtn.addEventListener('click',()=>{
-          document.body.classList.toggle('dark');
-          appData.darkMode=document.body.classList.contains('dark')?'1':'0';
-          saveAll();
-        });
-
-        // ---------- Profile ----------
-        const profileNameEl=byId('profileName');
-        byId('editNameBtn').addEventListener('click',()=>{
-          const n=prompt('Enter new name:',appData.profileName||'');
-          if(n){
-            appData.profileName=n;
-            profileNameEl.textContent=n;
-            saveAll();
-          }
-        });
-
-        const profilePhotoInput=byId('photoUpload');
-        profilePhotoInput.addEventListener('change',(e)=>{
-          const file=e.target.files[0];
-          if(file){
-            const reader=new FileReader();
-            reader.onload=function(ev){
-              appData.profilePhoto=ev.target.result;
-              byId('profilePhoto').src=ev.target.result;
-              saveAll();
-            };
-            reader.readAsDataURL(file);
-          }
-        });
-
-        // ---------- NEW: Notification Settings Logic ----------
-        function updateBrowserPermissionUI() {
-            if (!("Notification" in window)) {
-                byId('globalNotifStatus').innerHTML = '<h3>Browser Permission</h3><p style="color: #f44336;">Notifications are not supported by your browser.</p>';
-                return;
-            }
-
-            const status = Notification.permission;
-            const textEl = byId('browserPermissionText');
-            const boxEl = byId('globalNotifStatus');
-            const btnEl = byId('requestPermissionBtn');
-
-            boxEl.classList.remove('denied');
-
-            if (status === 'granted') {
-                textEl.innerHTML = 'Status: <b style="color: var(--accent);">Granted (ON)</b>';
-                btnEl.textContent = 'Permission Granted';
-                btnEl.disabled = true;
-            } else if (status === 'denied') {
-                textEl.innerHTML = 'Status: <b style="color: #f44336;">Denied (OFF)</b>. Please change in browser settings.';
-                btnEl.textContent = 'Permission Denied';
-                btnEl.disabled = true;
-                boxEl.classList.add('denied');
-            } else { // 'default' or not supported
-                textEl.innerHTML = 'Status: <b style="color: #ff9800;">Not Requested (OFF)</b>';
-                btnEl.textContent = 'Request Permission';
-                btnEl.disabled = false;
-            }
-        }
-
-        function requestNotificationPermission() {
-          if (!("Notification" in window)) {
-              alert("This browser does not support desktop notification");
-              return;
-          }
-          if (Notification.permission === 'granted' || Notification.permission === 'denied') {
-             updateBrowserPermissionUI();
-             return;
-          }
-
-          Notification.requestPermission().then(function(permission) {
-              updateBrowserPermissionUI();
-              if (permission === 'granted') {
-                 // Immediately check for notifications if permission is granted
-                 checkNotifications(true); 
-              }
-          });
-        }
-        
-        function renderNotificationPage() {
-            if (!("Notification" in window)) {
-                byId('globalNotifStatus').innerHTML = '<h3>Browser Permission</h3><p style="color: #f44336;">Notifications are not supported by your browser.</p>';
-                return;
-            }
-
-            updateBrowserPermissionUI();
-
-            // Setup custom category toggles based on appData
-            byId('toggleReminders').checked = appData.notifReminders;
-            byId('toggleNotes').checked = appData.notifNotes;
-            byId('toggleChecklist').checked = appData.notifChecklist;
-            byId('toggleBudget').checked = appData.notifBudget;
-        }
-
-        // Function to handle custom toggle changes
-        function handleCustomNotifToggle(category, event) {
-            appData[category] = event.target.checked;
-            saveAll();
-            // Re-check notifications immediately if a new category is toggled on
-            if (event.target.checked) checkNotifications(true);
-        }
-
-        // **FIX**: Updated notifications logic to be less time-specific and rely on the interval
-        // ---------- Notifications Logic (Updated) ----------
-        function checkNotifications(force=false){
-          // 1. Check global browser permission first
-          if(!(Notification && Notification.permission === 'granted')) {
-             console.log("Global notification permission not granted. Skipping custom checks.");
-             return;
-          }
-
-          const now=new Date();
-          const notifTimes=[8,13,18]; // 8 AM, 1 PM, 6 PM
-          const currentHour = now.getHours();
-          const currentMinute = now.getMinutes();
-
-          // Only proceed if it is one of the scheduled hours AND within the first 10 minutes of the hour (to ensure all 5-min intervals hit the window)
-          // or if force is true (e.g., after granting permission or toggling a setting)
-          const isNotificationTimeWindow = notifTimes.includes(currentHour) && currentMinute < 10;
-
-          if (!isNotificationTimeWindow && !force) return;
-          
-          // REMINDERS: Check if category is ON
-          if(appData.notifReminders) {
-            appData.reminders.forEach(r=>{
-              const diff=daysLeft(r.endDate);
-              if(diff===0||diff===1||diff<0){
-                  new Notification("Reminder Alert!", {
-                    body: `${r.title} - ${diff<0?'Expired':diff===0?'Today':'1 day left'}`,
-                    icon:'assets/icon.png'
-                  });
-              }
-            });
-          }
-
-          // CHECKLIST: Check if category is ON
-          if(appData.notifChecklist) {
-            const openChecks = appData.checklists.filter(c => c.status === 'open');
-            if (openChecks.length > 0) {
-                 new Notification("Checklist Alert!", {
-                    body: `You have ${openChecks.length} open checklist(s). Time to check them off!`,
-                    icon:'assets/icon.png'
-                  });
-            }
-          }
-          
-          // BUDGET: Check if category is ON
-          if(appData.notifBudget) {
-            appData.budget.forEach(b => {
-                const days = daysBetween(b.startDate, b.endDate);
-                const costPerDay = calculateCostPerDay(b.amount, b.startDate, b.endDate);
-                
-                // Only notify if a budget is active (days > 0) and cost is calculated
-                if (days > 0 && costPerDay > 0) {
-                    new Notification("Budget Tracker", {
-                        body: `Budget: ${b.title}. Recommended spend today: ₹${costPerDay}. ${days} days remaining.`,
-                        icon:'assets/icon.png'
-                    });
-                }
-            });
-          }
-          
-          // NOTES: (Future feature reminder)
-          if(appData.notifNotes && (currentHour === 18 || force)) { // Notify for Notes in the Evening (6 PM)
-              new Notification("Notes Sync Reminder", {
-                  body: "Remember to review and backup your important notes!",
-                  icon:'assets/icon.png'
-              });
-          }
-        }
-
-
-        // ---------- Event Listeners ----------
-        
-        // Notification Page Listener
-        byId('requestPermissionBtn').addEventListener('click', requestNotificationPermission);
-        byId('toggleReminders').addEventListener('change', (e) => handleCustomNotifToggle('notifReminders', e));
-        byId('toggleNotes').addEventListener('change', (e) => handleCustomNotifToggle('notifNotes', e));
-        byId('toggleChecklist').addEventListener('change', (e) => handleCustomNotifToggle('notifChecklist', e));
-        byId('toggleBudget').addEventListener('change', (e) => handleCustomNotifToggle('notifBudget', e));
-
-
-        byId('showAddFormBtn').addEventListener('click', function() {
-          toggleCollapse(byId('reminderFormContainer'), byId('showAddFormBtn'));
-        });
-
-        byId('cancelReminderBtn').addEventListener('click', function() {
-          hideForm(byId('reminderFormContainer'));
-          editingIndex=null;
-          clearReminderForm();
-          byId('saveReminderBtn').textContent = 'Save'; // Reset button text
-        });
-
-        byId('saveReminderBtn').addEventListener('click', saveReminder);
-        byId('viewRemindersToggle').addEventListener('click', function() {
-          toggleCollapse(byId('reminderList'), byId('viewRemindersToggle'));
-        });
-        byId('showAddNoteBtn').addEventListener('click', function() {
-          toggleCollapse(byId('noteFormContainer'), byId('showAddNoteBtn'));
-        });
-
-        byId('cancelNoteBtn').addEventListener('click', function() {
-          hideForm(byId('noteFormContainer'));
-          editingNoteIndex = null;
-          byId('noteText').value = ''; // Clear form
-          byId('noteFile').value = ''; // Clear file input
-          byId('tableFormatCheckbox').checked = false; // Reset checkbox
-          byId('saveNoteBtn').textContent = 'Save';
-        });
-
-        byId('saveNoteBtn').addEventListener('click', saveNote);
-
-        byId('viewNotesToggle').addEventListener('click', function() {
-          toggleCollapse(byId('noteList'), byId('viewNotesToggle'));
-        });
-
-        byId('homeRemindersToggle').addEventListener('click', function() {
-          toggleCollapse(byId('homeRemindersContainer'), byId('homeRemindersToggle'));
-        });
-
-        byId('homeNotesToggle').addEventListener('click', function() {
-          toggleCollapse(byId('homeNotesContainer'), byId('homeNotesToggle'));
-        });
-
-        byId('homeCheckToggle').addEventListener('click', function() {
-          toggleCollapse(byId('homeCheckContainer'), byId('homeCheckToggle'));
-        });
-
-        byId('showAddBudgetBtn').addEventListener('click', function() {
-          toggleCollapse(byId('budgetFormContainer'), byId('showAddBudgetBtn'));
-        });
-
-        byId('cancelBudgetBtn').addEventListener('click', function() {
-          hideForm(byId('budgetFormContainer'));
-          editingBudgetIndex=null;
-          clearBudgetForm();
-          byId('saveBudgetBtn').textContent = 'Save'; // Reset button text
-        });
-
-        byId('saveBudgetBtn').addEventListener('click', saveBudget);
-        byId('viewbudgetToggle').addEventListener('click', function() {
-          toggleCollapse(byId('budgetList'), byId('viewbudgetToggle'));
-        });
-        byId('homeBudgetsToggle').addEventListener('click', function() {
-          toggleCollapse(byId('homeBudgetsContainer'), byId('homeBudgetsToggle'));
-        });
-
-        // Check List Event Listeners
-        byId('showAddCheckBtn').addEventListener('click', function() {
-          toggleCollapse(byId('checkFormContainer'), byId('showAddCheckBtn'));
-        });
-
-        byId('cancelCheckBtn').addEventListener('click', function() {
-          hideForm(byId('checkFormContainer'));
-          editingCheckIndex = null;
-          byId('checkTitle').value = ''; // Clear form
-          byId('checkItems').value = ''; // Clear form
-          byId('saveCheckBtn').textContent = 'Save';
-        });
-
-        byId('saveCheckBtn').addEventListener('click', saveCheck);
-
-        byId('viewCheckToggle').addEventListener('click', function() {
-          toggleCollapse(byId('checkList'), byId('viewCheckToggle'));
-        });
-
-        document.querySelectorAll('.menu-btn[data-page]').forEach(btn=>{
-          btn.addEventListener('click',function() {
-            showPage(this.dataset.page);
-          });
-        });
-
-        function toggleCollapse(el, btn){
-          el.classList.toggle('visible');
-          btn.classList.toggle('open');
-        }
-
-        // ---------- FIX: Wait for the page to be fully loaded before rendering data ----------
-        window.addEventListener('load', () => {
-            // Set initial UI states from loaded data
-            if (appData.darkMode === '1') document.body.classList.add('dark');
-            if (appData.profileName) byId('profileName').textContent = appData.profileName;
-            if (appData.profilePhoto) byId('profilePhoto').src = appData.profilePhoto;
-
-            // Initial render of all data
-            renderReminders();
-            renderNotes();
-            renderBudgets();
-            renderChecklists();
             
-            // Setup notifications
-            if ("Notification" in window) {
-                updateBrowserPermissionUI();
+            // Only notify if a budget is active (days > 0) and cost is calculated
+            if (days > 0 && costPerDay > 0) {
+                new Notification("Budget Tracker", {
+                    body: `Budget: ${b.title}. Recommended spend today: ₹${costPerDay}. ${days} days remaining.`,
+                    icon:'assets/icon.png'
+                });
             }
-            // Check notifications on load, and then every 5 minutes
-            checkNotifications(true); // Initial check (force=true) to hit a notification time if just opened
-            setInterval(checkNotifications, 5 * 60 * 1000); 
         });
+      }
+      
+      // NOTES: (Future feature reminder)
+      if(appData.notifNotes && (currentHour === 18 || force)) { // Notify for Notes in the Evening (6 PM)
+          new Notification("Notes Sync Reminder", {
+              body: "Remember to review and backup your important notes!",
+              icon:'assets/icon.png'
+          });
+      }
+    }
+
+    // ---------- Event Listeners ----------
+    
+    // Notification Page Listener
+    byId('requestPermissionBtn').addEventListener('click', requestNotificationPermission);
+    byId('toggleReminders').addEventListener('change', (e) => handleCustomNotifToggle('notifReminders', e));
+    byId('toggleNotes').addEventListener('change', (e) => handleCustomNotifToggle('notifNotes', e));
+    byId('toggleChecklist').addEventListener('change', (e) => handleCustomNotifToggle('notifChecklist', e));
+    byId('toggleBudget').addEventListener('change', (e) => handleCustomNotifToggle('notifBudget', e));
+
+    byId('showAddFormBtn').addEventListener('click', function() {
+      toggleCollapse(byId('reminderFormContainer'), byId('showAddFormBtn'));
+    });
+
+    byId('cancelReminderBtn').addEventListener('click', function() {
+      hideForm(byId('reminderFormContainer'));
+      editingIndex=null;
+      clearReminderForm();
+      byId('saveReminderBtn').textContent = 'Save'; // Reset button text
+    });
+
+    byId('saveReminderBtn').addEventListener('click', saveReminder);
+    byId('viewRemindersToggle').addEventListener('click', function() {
+      toggleCollapse(byId('reminderList'), byId('viewRemindersToggle'));
+    });
+    byId('showAddNoteBtn').addEventListener('click', function() {
+      toggleCollapse(byId('noteFormContainer'), byId('showAddNoteBtn'));
+    });
+
+    byId('cancelNoteBtn').addEventListener('click', function() {
+      hideForm(byId('noteFormContainer'));
+      editingNoteIndex = null;
+      byId('noteText').value = ''; // Clear form
+      byId('noteFile').value = ''; // Clear file input
+      byId('tableFormatCheckbox').checked = false; // Reset checkbox
+      byId('saveNoteBtn').textContent = 'Save';
+    });
+
+    byId('saveNoteBtn').addEventListener('click', saveNote);
+
+    byId('viewNotesToggle').addEventListener('click', function() {
+      toggleCollapse(byId('noteList'), byId('viewNotesToggle'));
+    });
+
+    byId('homeRemindersToggle').addEventListener('click', function() {
+      toggleCollapse(byId('homeRemindersContainer'), byId('homeRemindersToggle'));
+    });
+
+    byId('homeNotesToggle').addEventListener('click', function() {
+      toggleCollapse(byId('homeNotesContainer'), byId('homeNotesToggle'));
+    });
+
+    byId('homeCheckToggle').addEventListener('click', function() {
+      toggleCollapse(byId('homeCheckContainer'), byId('homeCheckToggle'));
+    });
+
+    byId('showAddBudgetBtn').addEventListener('click', function() {
+      toggleCollapse(byId('budgetFormContainer'), byId('showAddBudgetBtn'));
+    });
+
+    byId('cancelBudgetBtn').addEventListener('click', function() {
+      hideForm(byId('budgetFormContainer'));
+      editingBudgetIndex=null;
+      clearBudgetForm();
+      byId('saveBudgetBtn').textContent = 'Save'; // Reset button text
+    });
+
+    byId('saveBudgetBtn').addEventListener('click', saveBudget);
+    byId('viewbudgetToggle').addEventListener('click', function() {
+      toggleCollapse(byId('budgetList'), byId('viewbudgetToggle'));
+    });
+    byId('homeBudgetsToggle').addEventListener('click', function() {
+      toggleCollapse(byId('homeBudgetsContainer'), byId('homeBudgetsToggle'));
+    });
+
+    // Check List Event Listeners
+    byId('showAddCheckBtn').addEventListener('click', function() {
+      toggleCollapse(byId('checkFormContainer'), byId('showAddCheckBtn'));
+    });
+
+    byId('cancelCheckBtn').addEventListener('click', function() {
+      hideForm(byId('checkFormContainer'));
+      editingCheckIndex = null;
+      byId('checkTitle').value = ''; // Clear form
+      byId('checkItems').value = ''; // Clear form
+      byId('saveCheckBtn').textContent = 'Save';
+    });
+
+    byId('saveCheckBtn').addEventListener('click', saveCheck);
+
+    byId('viewCheckToggle').addEventListener('click', function() {
+      toggleCollapse(byId('checkList'), byId('viewCheckToggle'));
+    });
+
+    document.querySelectorAll('.menu-btn[data-page]').forEach(btn=>{
+      btn.addEventListener('click',function() {
+        showPage(this.dataset.page);
+      });
+    });
+
+    function toggleCollapse(el, btn){
+      el.classList.toggle('visible');
+      btn.classList.toggle('open');
+    }
+
+    // ---------- FIX: Wait for the page to be fully loaded before rendering data ----------
+    window.addEventListener('load', () => {
+        // Set initial UI states from loaded data
+        if (appData.darkMode === '1') document.body.classList.add('dark');
+        if (appData.profileName) byId('profileName').textContent = appData.profileName;
+        if (appData.profilePhoto) byId('profilePhoto').src = appData.profilePhoto;
+
+        // Initial render of all data
+        renderReminders();
+        renderNotes();
+        renderBudgets();
+        renderChecklists();
         
-      })();
-    </script>
+        // Setup notifications
+        if (window.Notification) {
+            updateBrowserPermissionUI();
+        }
+        // Check notifications on load, and then every 5 minutes
+        checkNotifications(true); // Initial check (force=true) to hit a notification time if just opened
+        setInterval(checkNotifications, 5 * 60 * 1000); 
+    });
+    
+  })();
+</script>
+
+    
   </body>
 </html>
