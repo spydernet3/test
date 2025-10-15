@@ -118,7 +118,7 @@
         gap:6px;
         transition: left 0s;
       }
-      .form input[type="text"], .form input[type="date"], .form textarea, .form select {
+      .form input[type="text"], .form input[type="date"], .form textarea, .form select, .form input[type="number"] {
         padding:8px;
         border-radius:6px;
         border:1px solid #ccc;
@@ -163,6 +163,9 @@
       .dark .main { background:#151515; color:var(--text); }
       .dark .form { background: #232323; }
       .dark .menu-btn, .dark .icon-btn { background:#333; color:var(--text); }
+      .dark .list li { background: rgba(255,255,255,0.05); }
+      .dark .badge { background:#444; color: var(--text); }
+
 
       /* Settings panel styles */
       .settings-panel {
@@ -217,6 +220,8 @@
         padding: 8px;
         margin-top: 8px;
       }
+      .dark .scrollable-list { border-color: #444; }
+
 
       /* Scrollbar styling */
       .scrollable-list::-webkit-scrollbar {
@@ -228,16 +233,22 @@
         background: #f1f1f1;
         border-radius: 4px;
       }
+      .dark .scrollable-list::-webkit-scrollbar-track { background: #333; }
+
 
       .scrollable-list::-webkit-scrollbar-thumb {
         background: #888;
         border-radius: 4px;
       }
+      .dark .scrollable-list::-webkit-scrollbar-thumb { background: #555; }
+
 
       .scrollable-list::-webkit-scrollbar-thumb:hover {
         background: #555;
         border-radius: 4px;
       }
+      .dark .scrollable-list::-webkit-scrollbar-thumb:hover { background: #777; }
+
 
       /* Checklist status button */
       .status-btn {
@@ -266,6 +277,8 @@
         color: #666;
         text-decoration: none;
       }
+      .dark .branding-footer, .dark .branding-footer a { color: #aaa; }
+
 
       /* Notification Page Specific Styles */
       .notif-status-box {
@@ -275,10 +288,13 @@
         background: #e0f7fa;
         border: 1px solid #b2ebf2;
       }
+      .dark .notif-status-box { background: #004d40; border-color: #00897b; }
       .notif-status-box.denied {
         background: #ffebee;
         border: 1px solid #ffcdd2;
       }
+      .dark .notif-status-box.denied { background: #5c1414; border-color: #e57373; }
+
       .notif-setting-item {
         display: flex;
         justify-content: space-between;
@@ -286,6 +302,7 @@
         padding: 10px 0;
         border-bottom: 1px solid #eee;
       }
+      .dark .notif-setting-item { border-bottom-color: #333; }
       .notif-setting-item:last-child {
         border-bottom: none;
       }
@@ -482,8 +499,8 @@
               ></textarea>
             </label>
 
-            <label>
-              Table Format<input type="checkbox" id="tableFormatCheckbox" />
+            <label style="flex-direction: row; align-items: center;">
+              <input type="checkbox" id="tableFormatCheckbox" style="width: auto;" />
               <span>Enable table format</span>
             </label>
 
@@ -802,10 +819,12 @@
                   .catch((error) => {
                     console.log('SW registration failed: ', error);
                   });
+              } else {
+                 console.log('Service worker file not found, skipping registration');
               }
             })
             .catch(error => {
-              console.log('Service worker file not found, skipping registration');
+              console.log('Service worker file fetch failed, skipping registration');
             });
         });
       }
@@ -844,7 +863,7 @@
         // ---------- Helpers ----------
         function byId(id){ return document.getElementById(id); }
         
-        // Modified save function to use localStorage only
+        // **FIX**: Added proper error handling for QuotaExceededError
         async function saveAll() {
           try {
             const dataStr = JSON.stringify(appData);
@@ -855,10 +874,10 @@
           } catch (err) {
             console.error("Save failed:", err);
             // Alert user if localStorage quota is exceeded
-            if (err.name === 'QuotaExceededError') {
-              // Use a custom message box instead of alert()
-              // (NOTE: For simplicity here, sticking to the standard error console message as no custom UI for confirmation/alert was requested)
-              console.error("Storage is full. Please delete some data to make space.");
+            if (err.name === 'QuotaExceededError' || err.code === 22) { // Code 22 for Safari
+              alert("Storage is full. Maximum 500MB storage limit reached. Please delete some data (especially file attachments) to make space.");
+            } else {
+              alert("An error occurred while saving data. Check console for details.");
             }
           }
         }
@@ -886,8 +905,8 @@
           const month = months[date.getMonth()];
           const year = date.getFullYear();
 
-          // Get IST time (UTC+5:30)
-          const istHours = date.getHours();
+          // Get IST time (UTC+5:30) - NOTE: This relies on the system time being correctly set.
+          const istHours = date.getHours(); 
           const istMinutes = date.getMinutes().toString().padStart(2, '0');
           const ampm = istHours >= 12 ? 'PM' : 'AM';
           const displayHours = istHours % 12 || 12;
@@ -913,7 +932,7 @@
           return (amount / days).toFixed(2);
         }
 
-        // ---------- Render Functions (Reminders, Notes, Budget, Checklists) are unchanged from previous working version...
+        // ---------- Render Functions ----------
         
         function renderReminders(){
           const list = byId('reminderList'); list.innerHTML = '';
@@ -1003,36 +1022,25 @@
             const left = document.createElement('div');
             left.className = 'item-left';
 
+            // Show first line or table preview
             if(n.isTable && n.text) {
-              // Show first few rows of table in home view
-              const lines = n.text.split('\n');
-              let tableHTML = '<table border=\"1\" style=\"border-collapse: collapse; width: 100%;\">';
-
-              lines.forEach((line, index) => {
-                if(line.includes('---')) {
-                  if(index > 0) tableHTML += '</tr>';
-                  tableHTML += '<tr>';
-                } else if(line.includes('|')) {
-                  const cells = line.split('|').filter(cell => cell.trim() !== '');
-                  cells.forEach(cell => {
-                    const cellContent = cell.trim();
-                    if(index === 0) {
-                      tableHTML += `<th style=\"border: 1px solid #ddd; padding: 4px;\">${cellContent}</th>`;
-                    } else {
-                      tableHTML += `<td style=\"border: 1px solid #ddd; padding: 4px;\">${cellContent}</td>`;
-                    }
-                  });
-                }
-              });
-
-              tableHTML += '</tr></table>';
-              const text = document.createElement('div');
-              text.innerHTML = tableHTML;
-              left.appendChild(text);
+              const lines = n.text.split('\n').filter(line => line.trim() !== '' && !line.includes('Created:'));
+              let text = 'Table Note: ';
+              if(lines.length > 0) {
+                 const firstLine = lines[0].replace(/\|/g, ' - ').trim(); // Preview the header/first row
+                 text += firstLine.substring(0, 50) + (firstLine.length > 50 ? '...' : '');
+              }
+              const textEl = document.createElement('div');
+              textEl.innerHTML = `<b>${text}</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
+              left.appendChild(textEl);
+              
             } else {
-              const text = document.createElement('div');
-              text.innerHTML = `<b>${n.text || ''}</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
-              left.appendChild(text);
+              // Standard note preview
+              const noteText = n.text || '';
+              const firstLine = noteText.split('\n')[0].substring(0, 100);
+              const textEl = document.createElement('div');
+              textEl.innerHTML = `<b>${firstLine} ...</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
+              left.appendChild(textEl);
             }
 
             // ✅ Add image thumbnail if note has image (use loop variable `n`)
@@ -1072,20 +1080,26 @@
             if(note.isTable && note.text) {
               // Convert table format to HTML table
               const lines = note.text.split('\n');
-              let tableHTML = '<table border=\"1\" style=\"border-collapse: collapse; width: 100%;\">';
+              let tableHTML = '<table border=\"1\" style=\"border-collapse: collapse; width: 100%; font-size: 13px;\">';
+              let inHeader = true; // Assume the first non-date line is the header
 
-              lines.forEach((line, index) => {
+              lines.forEach((line) => {
+                if(line.includes('Created:')) {
+                    // Skip date line in table rendering (already displayed below)
+                    return;
+                }
                 if(line.includes('---')) {
                   // Row separator - add closing tags for previous row
-                  if(index > 0) tableHTML += '</tr>';
+                  tableHTML += '</tr>';
+                  inHeader = false; // Next line is regular data row
                   tableHTML += '<tr>';
                 } else if(line.includes('|')) {
                   // Table row
                   const cells = line.split('|').filter(cell => cell.trim() !== '');
                   cells.forEach(cell => {
                     const cellContent = cell.trim();
-                    if(index === 0) {
-                      tableHTML += `<th style=\"border: 1px solid #ddd; padding: 8px;\">${cellContent}</th>`;
+                    if(inHeader) {
+                      tableHTML += `<th style=\"border: 1px solid #ddd; padding: 8px; text-align: left;\">${cellContent}</th>`;
                     } else {
                       tableHTML += `<td style=\"border: 1px solid #ddd; padding: 8px;\">${cellContent}</td>`;
                     }
@@ -1096,10 +1110,15 @@
               tableHTML += '</tr></table>';
               text.innerHTML = tableHTML;
             } else {
-              text.innerHTML=`<b>${note.text||''}</b><br>
-                <small style=\"opacity:0.7\">${note.createdAt||''}</small>`;
+              // Display simple text note
+              text.innerHTML=`<b>${note.text||''}</b>`;
             }
             left.appendChild(text);
+
+            // Display Creation Date
+            const dateEl = document.createElement('div');
+            dateEl.innerHTML = `<small style=\"opacity:0.7\">${note.createdAt||''}</small>`;
+            left.appendChild(dateEl);
 
             // --- file rendering ---
             if(note.file){
@@ -1112,6 +1131,7 @@
                 fileEl.style.maxWidth='200px';
                 fileEl.style.display='block';
                 fileEl.style.marginTop='5px';
+                fileEl.alt='Attached Image';
               }
               // 🎵 --- Audio Support ---
               else if(note.file.type.includes('audio')){
@@ -1228,8 +1248,6 @@
           container.appendChild(frag);
         }
         
-        // ... (Other functions like editBudget, deleteBudget, saveBudget, clearBudgetForm, editReminder, deleteReminder, saveReminder, clearReminderForm, deleteNote, editNote, saveNote, deleteCheck, editCheck, toggleCheckStatus, saveCheck are unchanged, omitted for brevity)
-        
         function editBudget(i){
           const b=appData.budget[i];
           editingBudgetIndex=i;
@@ -1237,11 +1255,13 @@
           byId('budgetAmount').value=b.amount;
           byId('budgetStartDate').value=b.startDate||'';
           byId('budgetEndDate').value=b.endDate||'';
+          byId('saveBudgetBtn').textContent = 'Update';
           showForm(byId('budgetFormContainer'));
         }
 
+        // **FIX**: Added proper confirmation dialog
         function deleteBudget(index){
-          if(!('Delete this budget?')) return;
+          if(!confirm('Delete this budget?')) return;
           appData.budget.splice(index, 1);
           saveAll();
           renderBudgets();
@@ -1253,11 +1273,18 @@
           const amount=byId('budgetAmount').value;
           const start=byId('budgetStartDate').value;
           const end=byId('budgetEndDate').value;
-          if(!title || !amount){ console.error('Title and amount required'); return; }
+          if(!title || !amount){ alert('Title and amount required'); return; }
+          if (new Date(start) > new Date(end)) { alert('Start date cannot be after end date.'); return; }
+
           const budgetObj={ title, amount, startDate:start, endDate:end };
           if(editingBudgetIndex!==null){ appData.budget[editingBudgetIndex]=budgetObj; editingBudgetIndex=null; }
           else{ appData.budget.push(budgetObj); }
-          saveAll(); renderBudgets(); hideForm(byId('budgetFormContainer')); clearBudgetForm();
+          
+          saveAll(); 
+          renderBudgets(); 
+          hideForm(byId('budgetFormContainer')); 
+          clearBudgetForm();
+          byId('saveBudgetBtn').textContent = 'Save';
         }
 
         function clearBudgetForm(){
@@ -1273,11 +1300,13 @@
           byId('reminderTitle').value=r.title;
           byId('startDate').value=r.startDate||'';
           byId('endDate').value=r.endDate||'';
+          byId('saveReminderBtn').textContent = 'Update';
           showForm(byId('reminderFormContainer'));
         }
 
+        // **FIX**: Added proper confirmation dialog
         function deleteReminder(index){
-          if(!('Delete this reminder?')) return;
+          if(!confirm('Delete this reminder?')) return;
           appData.reminders.splice(index, 1);
           saveAll();
           renderReminders();
@@ -1288,11 +1317,18 @@
           const title=byId('reminderTitle').value.trim();
           const start=byId('startDate').value;
           const end=byId('endDate').value;
-          if(!title){ console.error('Title required'); return; }
+          if(!title){ alert('Title required'); return; }
+          if (start && end && new Date(start) > new Date(end)) { alert('Start date cannot be after end date.'); return; }
+
           const reminderObj={ title, startDate:start, endDate:end };
           if(editingIndex!==null){ appData.reminders[editingIndex]=reminderObj; editingIndex=null; }
           else{ appData.reminders.push(reminderObj); }
-          saveAll(); renderReminders(); hideForm(byId('reminderFormContainer')); clearReminderForm();
+          
+          saveAll(); 
+          renderReminders(); 
+          hideForm(byId('reminderFormContainer')); 
+          clearReminderForm();
+          byId('saveReminderBtn').textContent = 'Save';
         }
 
         function clearReminderForm(){
@@ -1301,8 +1337,9 @@
           byId('endDate').value='';
         }
         
+        // **FIX**: Added proper confirmation dialog
         function deleteNote(index){
-          if(!('Delete this note?')) return;
+          if(!confirm('Delete this note?')) return;
           appData.notes.splice(index,1);
           saveAll();
           renderNotes();
@@ -1312,9 +1349,16 @@
         function editNote(index){
           const note = appData.notes[index];
           editingNoteIndex = index;
+          
+          // **FIX**: Remove the 'Created:' date line from the textarea when editing a table note
+          let noteTextForEdit = note.text || '';
+          if(note.isTable && noteTextForEdit.includes('Created:')) {
+             noteTextForEdit = noteTextForEdit.split('\n').slice(2).join('\n').trim();
+          }
 
-          byId('noteText').value = note.text || '';
+          byId('noteText').value = noteTextForEdit;
           byId('tableFormatCheckbox').checked = note.isTable || false;
+          byId('noteFile').value = ''; // Reset file input to prevent accidental resave of old file
 
           // Show the form
           showForm(byId('noteFormContainer'));
@@ -1329,8 +1373,11 @@
           const file = fileInput.files[0];
           const isTableFormat = byId('tableFormatCheckbox').checked;
 
-          if(!text && !file){
-            console.error('Note cannot be empty (text or file required)');
+          // If editing, use the existing file unless a new one is uploaded
+          const existingFile = editingNoteIndex !== null ? appData.notes[editingNoteIndex].file : null;
+
+          if(!text && !file && !existingFile){
+            alert('Note cannot be empty (text or file required)');
             return;
           }
 
@@ -1346,7 +1393,7 @@
           const noteObj = {
             text: noteText,
             createdAt: noteDate,
-            file: null,
+            file: existingFile, // Use existing file by default
             isTable: isTableFormat
           };
 
@@ -1358,12 +1405,15 @@
                 type: file.type,
                 data: e.target.result
               };
+              
               if(editingNoteIndex !== null){
                 appData.notes[editingNoteIndex] = noteObj;
                 editingNoteIndex = null;
               } else {
                 appData.notes.push(noteObj);
               }
+              
+              // After save, reset form and render
               saveAll(); renderNotes(); renderHomeNotes();
               hideForm(byId('noteFormContainer'));
               byId('noteText').value='';
@@ -1377,6 +1427,7 @@
             };
             reader.readAsDataURL(file);
           } else {
+            // No new file, save with existing file (if editing) or no file (if creating)
             if(editingNoteIndex !== null){
               appData.notes[editingNoteIndex] = noteObj;
               editingNoteIndex = null;
@@ -1392,8 +1443,9 @@
           }
         }
         
+        // **FIX**: Added proper confirmation dialog
         function deleteCheck(index){
-          if(!('Delete this checklist?')) return;
+          if(!confirm('Delete this checklist?')) return;
           appData.checklists.splice(index,1);
           saveAll();
           renderChecklists();
@@ -1430,7 +1482,7 @@
           const items = itemsText ? itemsText.split('\n').filter(item => item.trim() !== '') : [];
 
           if(!title){
-            console.error('Title required');
+            alert('Title required');
             return;
           }
 
@@ -1469,9 +1521,11 @@
             appData.checklists = [];
           }
 
-          if(appData.checklists.length === 0){
+          const openChecks = appData.checklists.filter(c => c.status === 'open');
+
+          if(openChecks.length === 0){
             const li = document.createElement('li');
-            li.textContent = 'No checklists yet.';
+            li.textContent = 'No open checklists.';
             li.style.opacity = '0.7';
             container.appendChild(li);
             return;
@@ -1479,12 +1533,10 @@
 
           const frag = document.createDocumentFragment();
 
-          appData.checklists.forEach(check => {
-            if(check.status === 'open') {
-              const li = document.createElement('li');
-              li.textContent = `\"${check.title}\" - ${check.items.length} items`;
-              frag.appendChild(li);
-            }
+          openChecks.forEach(check => {
+            const li = document.createElement('li');
+            li.textContent = `\"${check.title}\" - ${check.items.length} items`;
+            frag.appendChild(li);
           });
 
           container.appendChild(frag);
@@ -1493,7 +1545,7 @@
         function renderChecklists(){
           const list = byId('checkList'); list.innerHTML = '';
           // Ensure appData.checklists exists and is an array
-          if (!appData.checklists || !Array.isArray(appData.checklists)) {
+          if (!appData.checklists || !ArrayAray.isArray(appData.checklists)) {
             appData.checklists = [];
           }
           if(appData.checklists.length === 0){
@@ -1552,6 +1604,7 @@
             statusBtn.className = 'status-btn';
             statusBtn.textContent = check.status === 'open' ? 'Open' : 'Closed';
             statusBtn.title = 'Change Status';
+            statusBtn.style.backgroundColor = check.status === 'open' ? '#4CAF50' : '#f44336';
             statusBtn.addEventListener('click', () => toggleCheckStatus(i));
 
             const editBtn = document.createElement('button');
@@ -1600,8 +1653,7 @@
           sidebar.style.left = '-220px';
           main.style.marginLeft = '0';
           toggleBtn.textContent = '⮞';
-          sidebar.style.transition = 'left 0s';   // instant hide
-          main.style.transition = 'margin-left 0s'; // instant hide
+          // **FIX**: Removed 'transition: left 0s;' from JS to allow CSS transitions if needed, but keeping the instant effect by just changing properties.
         }
 
         // ---------- Sidebar Toggle ----------
@@ -1630,7 +1682,6 @@
 
         // ---------- Dark Mode ----------
         const darkBtn=byId('darkModeBtn');
-        // if(appData.darkMode==='1') document.body.classList.add('dark'); // MOVED
         darkBtn.addEventListener('click',()=>{
           document.body.classList.toggle('dark');
           appData.darkMode=document.body.classList.contains('dark')?'1':'0';
@@ -1639,7 +1690,6 @@
 
         // ---------- Profile ----------
         const profileNameEl=byId('profileName');
-        // if(appData.profileName) profileNameEl.textContent=appData.profileName; // MOVED
         byId('editNameBtn').addEventListener('click',()=>{
           const n=prompt('Enter new name:',appData.profileName||'');
           if(n){
@@ -1662,10 +1712,14 @@
             reader.readAsDataURL(file);
           }
         });
-        // if(appData.profilePhoto) byId('profilePhoto').src=appData.profilePhoto; // MOVED
 
         // ---------- NEW: Notification Settings Logic ----------
         function updateBrowserPermissionUI() {
+            if (!("Notification" in window)) {
+                byId('globalNotifStatus').innerHTML = '<h3>Browser Permission</h3><p style="color: #f44336;">Notifications are not supported by your browser.</p>';
+                return;
+            }
+
             const status = Notification.permission;
             const textEl = byId('browserPermissionText');
             const boxEl = byId('globalNotifStatus');
@@ -1691,7 +1745,7 @@
 
         function requestNotificationPermission() {
           if (!("Notification" in window)) {
-              console.error("This browser does not support desktop notification");
+              alert("This browser does not support desktop notification");
               return;
           }
           if (Notification.permission === 'granted' || Notification.permission === 'denied') {
@@ -1701,6 +1755,10 @@
 
           Notification.requestPermission().then(function(permission) {
               updateBrowserPermissionUI();
+              if (permission === 'granted') {
+                 // Immediately check for notifications if permission is granted
+                 checkNotifications(true); 
+              }
           });
         }
         
@@ -1724,11 +1782,12 @@
             appData[category] = event.target.checked;
             saveAll();
             // Re-check notifications immediately if a new category is toggled on
-            if (event.target.checked) checkNotifications();
+            if (event.target.checked) checkNotifications(true);
         }
 
+        // **FIX**: Updated notifications logic to be less time-specific and rely on the interval
         // ---------- Notifications Logic (Updated) ----------
-        function checkNotifications(){
+        function checkNotifications(force=false){
           // 1. Check global browser permission first
           if(!(Notification && Notification.permission === 'granted')) {
              console.log("Global notification permission not granted. Skipping custom checks.");
@@ -1736,15 +1795,16 @@
           }
 
           const now=new Date();
-          const notifTimes=[8,13,18];
+          const notifTimes=[8,13,18]; // 8 AM, 1 PM, 6 PM
           const currentHour = now.getHours();
+          const currentMinute = now.getMinutes();
 
-          // Helper to check if a notification should be sent for the current hour (8 AM, 1 PM, 6 PM)
-          const isNotificationTime = notifTimes.includes(currentHour);
+          // Only proceed if it is one of the scheduled hours AND within the first 10 minutes of the hour (to ensure all 5-min intervals hit the window)
+          // or if force is true (e.g., after granting permission or toggling a setting)
+          const isNotificationTimeWindow = notifTimes.includes(currentHour) && currentMinute < 10;
 
-          // Only proceed if it is one of the scheduled hours
-          if (!isNotificationTime) return;
-
+          if (!isNotificationTimeWindow && !force) return;
+          
           // REMINDERS: Check if category is ON
           if(appData.notifReminders) {
             appData.reminders.forEach(r=>{
@@ -1786,7 +1846,7 @@
           }
           
           // NOTES: (Future feature reminder)
-          if(appData.notifNotes && currentHour === 18) { // Only notify for Notes in the Evening (6 PM)
+          if(appData.notifNotes && (currentHour === 18 || force)) { // Notify for Notes in the Evening (6 PM)
               new Notification("Notes Sync Reminder", {
                   body: "Remember to review and backup your important notes!",
                   icon:'assets/icon.png'
@@ -1813,6 +1873,7 @@
           hideForm(byId('reminderFormContainer'));
           editingIndex=null;
           clearReminderForm();
+          byId('saveReminderBtn').textContent = 'Save'; // Reset button text
         });
 
         byId('saveReminderBtn').addEventListener('click', saveReminder);
@@ -1826,6 +1887,9 @@
         byId('cancelNoteBtn').addEventListener('click', function() {
           hideForm(byId('noteFormContainer'));
           editingNoteIndex = null;
+          byId('noteText').value = ''; // Clear form
+          byId('noteFile').value = ''; // Clear file input
+          byId('tableFormatCheckbox').checked = false; // Reset checkbox
           byId('saveNoteBtn').textContent = 'Save';
         });
 
@@ -1855,6 +1919,7 @@
           hideForm(byId('budgetFormContainer'));
           editingBudgetIndex=null;
           clearBudgetForm();
+          byId('saveBudgetBtn').textContent = 'Save'; // Reset button text
         });
 
         byId('saveBudgetBtn').addEventListener('click', saveBudget);
@@ -1873,6 +1938,8 @@
         byId('cancelCheckBtn').addEventListener('click', function() {
           hideForm(byId('checkFormContainer'));
           editingCheckIndex = null;
+          byId('checkTitle').value = ''; // Clear form
+          byId('checkItems').value = ''; // Clear form
           byId('saveCheckBtn').textContent = 'Save';
         });
 
@@ -1910,7 +1977,8 @@
             if ("Notification" in window) {
                 updateBrowserPermissionUI();
             }
-            checkNotifications();
+            // Check notifications on load, and then every 5 minutes
+            checkNotifications(true); // Initial check (force=true) to hit a notification time if just opened
             setInterval(checkNotifications, 5 * 60 * 1000); 
         });
         
@@ -1918,4 +1986,3 @@
     </script>
   </body>
 </html>
-
