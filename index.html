@@ -843,10 +843,9 @@
         </div>
       </div>
     </div>
-
 <script>
-      // Service Worker Registration block REMOVED to fix the 404 error
-
+      // Service Worker Registration block REMOVED to fix the 404 error on sw.js
+      
       (function () {
         // ---------- Storage ----------
 
@@ -893,8 +892,6 @@
             console.error("Save failed:", err);
             // Alert user if localStorage quota is exceeded
             if (err.name === 'QuotaExceededError') {
-              // Use a custom message box instead of alert()
-              // (NOTE: For simplicity here, sticking to the standard error console message as no custom UI for confirmation/alert was requested)
               console.error("Storage is full. Please delete some data to make space.");
             }
           }
@@ -950,7 +947,7 @@
           return (amount / days).toFixed(2);
         }
 
-        // ---------- Render Functions (Reminders, Notes, Budget, Checklists) are unchanged from previous working version...
+        // ---------- Render Functions (Reminders, Notes, Budget, Checklists) ----------
 
         function renderReminders(){
           const list = byId('reminderList'); list.innerHTML = '';
@@ -1275,7 +1272,7 @@
           showForm(byId('budgetFormContainer'));
         }
 
-        // *** CORRECTED FUNCTION: Direct deletion, no confirmation ***
+        // *** FIXED: Direct deletion, no confirmation ***
         function deleteBudget(index){
           appData.budget.splice(index, 1);
           saveAll();
@@ -1311,7 +1308,7 @@
           showForm(byId('reminderFormContainer'));
         }
 
-        // *** CORRECTED FUNCTION: Direct deletion, no confirmation ***
+        // *** FIXED: Direct deletion, no confirmation ***
         function deleteReminder(index){
           appData.reminders.splice(index, 1);
           saveAll();
@@ -1336,7 +1333,7 @@
           byId('endDate').value='';
         }
 
-        // *** CORRECTED FUNCTION: Direct deletion, no confirmation ***
+        // *** FIXED: Direct deletion, no confirmation ***
         function deleteNote(index){
           appData.notes.splice(index,1);
           saveAll();
@@ -1427,7 +1424,7 @@
           }
         }
 
-        // *** CORRECTED FUNCTION: Direct deletion, no confirmation ***
+        // *** FIXED: Direct deletion, no confirmation ***
         function deleteCheck(index){
           appData.checklists.splice(index,1);
           saveAll();
@@ -1920,6 +1917,8 @@
           });
         });
 
+        // *** ARIA FIX: Modified function to only toggle classes, removing any logic 
+        // that could incorrectly apply aria-hidden="true" to a focusable container. ***
         function toggleCollapse(el, btn){
           el.classList.toggle('visible');
           btn.classList.toggle('open');
@@ -1950,5 +1949,6 @@
 
       })();
     </script>
+
   </body>
 </html>
