@@ -1917,17 +1917,17 @@
           });
         });
 
-        // *** FINAL ARIA FIX: Using the 'hidden' HTML attribute for robust accessibility. ***
+        // *** FINAL FIX: Explicitly controlling aria-hidden along with the hidden attribute ***
         function toggleCollapse(el, btn){
-          el.classList.toggle('visible');
+          const isVisible = el.classList.toggle('visible');
           btn.classList.toggle('open');
           
-          if (el.classList.contains('visible')) {
+          if (isVisible) {
             el.removeAttribute('hidden');
+            el.removeAttribute('aria-hidden'); // *** Ensure it's not hidden from ARIA when visible ***
           } else {
-            // Setting the hidden attribute properly hides the element from display, 
-            // focus, and the accessibility tree, solving the ARIA warning.
-            el.setAttribute('hidden', 'hidden'); 
+            el.setAttribute('hidden', 'hidden'); // Hides and makes it non-focusable
+            el.setAttribute('aria-hidden', 'true'); // *** Ensure it IS hidden from ARIA when collapsed ***
           }
         }
 
