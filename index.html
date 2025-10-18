@@ -1917,11 +1917,18 @@
           });
         });
 
-        // *** ARIA FIX: Modified function to only toggle classes, removing any logic 
-        // that could incorrectly apply aria-hidden="true" to a focusable container. ***
+        // *** FINAL ARIA FIX: Using the 'hidden' HTML attribute for robust accessibility. ***
         function toggleCollapse(el, btn){
           el.classList.toggle('visible');
           btn.classList.toggle('open');
+          
+          if (el.classList.contains('visible')) {
+            el.removeAttribute('hidden');
+          } else {
+            // Setting the hidden attribute properly hides the element from display, 
+            // focus, and the accessibility tree, solving the ARIA warning.
+            el.setAttribute('hidden', 'hidden'); 
+          }
         }
 
         // ---------- Initial Render Code ----------
@@ -1949,6 +1956,5 @@
 
       })();
     </script>
-
   </body>
 </html>
