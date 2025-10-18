@@ -843,7 +843,7 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           // Check for sw.js availability before attempting to register
-          fetch('/js/sw.js', { method: 'HEAD' })
+          fetch('/scripts/sw.js', { method: 'HEAD' })
             .then(response => {
               // Only attempt registration if the file exists and is accessible
               if (response.ok && response.headers.get('content-type').includes('javascript')) {
