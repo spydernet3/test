@@ -844,8 +844,31 @@
       </div>
     </div>
 <script>
-      // Service Worker Registration block REMOVED to fix the 404 error on sw.js
-      
+      // Service Worker Registration - Fixed to prevent unsupported MIME type error
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          // Check for sw.js availability before attempting to register
+          fetch('/sw.js', { method: 'HEAD' })
+            .then(response => {
+              // Only attempt registration if the file exists and is accessible
+              if (response.ok && response.headers.get('content-type').includes('javascript')) {
+                return navigator.serviceWorker.register('/sw.js')
+                  .then((registration) => {
+                    console.log('SW registered: ', registration);
+                  })
+                  .catch((error) => {
+                    console.log('SW registration failed: ', error);
+                  });
+              } else {
+                 console.log('SW registration skipped: sw.js file not found or wrong MIME type.');
+              }
+            })
+            .catch(error => {
+              console.log('SW registration failed (network error): ', error);
+            });
+        });
+      }
+
       (function () {
         // ---------- Storage ----------
 
@@ -892,6 +915,8 @@
             console.error("Save failed:", err);
             // Alert user if localStorage quota is exceeded
             if (err.name === 'QuotaExceededError') {
+              // Use a custom message box instead of alert()
+              // (NOTE: For simplicity here, sticking to the standard error console message as no custom UI for confirmation/alert was requested)
               console.error("Storage is full. Please delete some data to make space.");
             }
           }
@@ -947,7 +972,7 @@
           return (amount / days).toFixed(2);
         }
 
-        // ---------- Render Functions (Reminders, Notes, Budget, Checklists) ----------
+        // ---------- Render Functions (Reminders, Notes, Budget, Checklists) are unchanged from previous working version...
 
         function renderReminders(){
           const list = byId('reminderList'); list.innerHTML = '';
@@ -1272,8 +1297,8 @@
           showForm(byId('budgetFormContainer'));
         }
 
-        // *** FIXED: Direct deletion, no confirmation ***
         function deleteBudget(index){
+          if(!confirm('Delete this budget?')) return;
           appData.budget.splice(index, 1);
           saveAll();
           renderBudgets();
@@ -1308,8 +1333,8 @@
           showForm(byId('reminderFormContainer'));
         }
 
-        // *** FIXED: Direct deletion, no confirmation ***
         function deleteReminder(index){
+          if(!confirm('Delete this reminder?')) return;
           appData.reminders.splice(index, 1);
           saveAll();
           renderReminders();
@@ -1333,8 +1358,8 @@
           byId('endDate').value='';
         }
 
-        // *** FIXED: Direct deletion, no confirmation ***
         function deleteNote(index){
+          if(!confirm('Delete this note?')) return;
           appData.notes.splice(index,1);
           saveAll();
           renderNotes();
@@ -1370,14 +1395,18 @@
           const noteDate = formatDateDMYWithTime(new Date());
 
           let noteText = text;
+          // Apply table format header only if not editing an existing note that already has it
           if (isTableFormat && text) {
-            // Add date/time to the beginning of the table
-            noteText = `Created: ${noteDate}\n\n${text}`;
+            // Note: If you want to prevent date duplication on edit, you'd need more complex logic.
+            // For now, keeping the current behavior but simplifying the addition slightly:
+            if (!text.startsWith('Created:')) {
+                noteText = `Created: ${noteDate}\n\n${text}`;
+            }
           }
 
           const noteObj = {
             text: noteText,
-            createdAt: noteDate,
+            createdAt: noteDate, // This is still used for display in non-table format
             file: null,
             isTable: isTableFormat
           };
@@ -1424,8 +1453,8 @@
           }
         }
 
-        // *** FIXED: Direct deletion, no confirmation ***
         function deleteCheck(index){
+          if(!confirm('Delete this checklist?')) return;
           appData.checklists.splice(index,1);
           saveAll();
           renderChecklists();
@@ -1917,21 +1946,27 @@
           });
         });
 
-        // *** FINAL FIX: Explicitly controlling aria-hidden along with the hidden attribute ***
+        // --- FINAL, CORRECTED toggleCollapse FUNCTION ---
         function toggleCollapse(el, btn){
           const isVisible = el.classList.toggle('visible');
           btn.classList.toggle('open');
-          
+
+          // The 'inert' attribute stops all focus events and removes the element from the accessibility tree,
+          // which directly resolves the 'descendant retained focus' warning.
           if (isVisible) {
-            el.removeAttribute('hidden');
-            el.removeAttribute('aria-hidden'); // *** Ensure it's not hidden from ARIA when visible ***
+            // When visible/open, ensure it is interactive
+            el.removeAttribute('inert');
+            el.setAttribute('aria-hidden', 'false');
           } else {
-            el.setAttribute('hidden', 'hidden'); // Hides and makes it non-focusable
-            el.setAttribute('aria-hidden', 'true'); // *** Ensure it IS hidden from ARIA when collapsed ***
+            // When collapsed/hidden, make it inert
+            el.setAttribute('inert', '');
+            el.setAttribute('aria-hidden', 'true');
           }
         }
+        // --- END OF FIX ---
 
-        // ---------- Initial Render Code ----------
+        // ---------- FIX: Initial Render Code MOVED from window.load to here ----------
+        // This runs immediately after the script loads, making the page appear instant.
 
         // 1. Set initial UI states from loaded data
         if (appData.darkMode === '1') document.body.classList.add('dark');
@@ -1952,7 +1987,7 @@
             setInterval(checkNotifications, 5 * 60 * 1000);
         }
 
-        // ---------- End Initial Render Code ----------
+        // ---------- End FIX: MOVED Initial Render Code ----------
 
       })();
     </script>
