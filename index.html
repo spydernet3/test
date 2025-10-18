@@ -196,14 +196,14 @@
 
       #showAddFormBtn:hover, #homeRemindersToggle:hover, #showAddNoteBtn:hover, #viewNotesToggle:hover,
       #homeNotesToggle:hover, #homeBudgetsToggle:hover, #homeCheckToggle:hover, #showAddBudgetBtn:hover,
-      #viewbudgetToggle:hover, #showAddCheckBtn:hover, #viewCheckToggle:hover {
+      #viewbudgetToggle:hover, #showAddCheckBtn:hover, #viewCheckToggle:hover, #viewRemindersToggle:hover {
         background: #aaa;
       }
 
       #showAddFormBtn.open .arrow, #homeRemindersToggle.open .arrow, #showAddNoteBtn.open .arrow,
       #viewNotesToggle.open .arrow, #homeNotesToggle.open .arrow, #homeBudgetsToggle.open .arrow,
       #homeCheckToggle.open .arrow, #showAddBudgetBtn.open .arrow, #viewbudgetToggle.open .arrow,
-      #showAddCheckBtn.open .arrow, #viewCheckToggle.open .arrow {
+      #showAddCheckBtn.open .arrow, #viewCheckToggle.open .arrow, #viewRemindersToggle.open .arrow {
         transform: rotate(180deg);
         transition: left 0s;
       }
@@ -1758,7 +1758,55 @@
             if (event.target.checked) checkNotifications();
         }
 
-        // ---------- Notifications Logic (Updated) ----------
+
+        // ---------- Notifications Logic (Updated for comprehensive summary) ----------
+        
+        // Helper 1: Reminders (Today or Tomorrow)
+        function buildReminderSummary() {
+            let summary = [];
+            appData.reminders.forEach(r => {
+                const diff = daysLeft(r.endDate);
+                if (diff === 0 || diff === 1) { // Only Today or Tomorrow as per home screen
+                    summary.push(`- ${r.title} | ${diff === 0 ? 'Today' : 'Tomorrow'}`);
+                }
+            });
+            return summary.length > 0 ? summary.join('\n') : "No reminders due today/tomorrow.";
+        }
+        
+        // Helper 2: Checklist (Open status)
+        function buildChecklistSummary() {
+            let summary = [];
+            const openChecks = appData.checklists.filter(c => c.status === 'open');
+            if (openChecks.length === 0) return "No open checklists.";
+
+            openChecks.slice(0, 3).forEach(c => { // List top 3 open lists
+                summary.push(`- ${c.title} (${c.items.length} items)`);
+            });
+
+            if (openChecks.length > 3) {
+                summary.push(`... and ${openChecks.length - 3} more open lists.`);
+            }
+
+            return summary.join('\n');
+        }
+
+        // Helper 3: Budget (Overview/Cost per day)
+        function buildBudgetSummary() {
+            let summary = [];
+            if (appData.budget.length === 0) return "No active budgets to track.";
+
+            appData.budget.forEach(b => {
+                const days = daysBetween(b.startDate, b.endDate);
+                const costPerDay = calculateCostPerDay(b.amount, b.startDate, b.endDate);
+                // Only show if budget is active
+                if (days > 0 && costPerDay > 0) {
+                    summary.push(`- ${b.title}: ₹${costPerDay}/day for ${days} days`);
+                }
+            });
+            return summary.length > 0 ? summary.join('\n') : "No active budget overview available.";
+        }
+
+
         function checkNotifications(){
           // 1. Check global browser permission first
           if(!(Notification && Notification.permission === 'granted')) {
@@ -1767,60 +1815,53 @@
           }
 
           const now=new Date();
-          const notifTimes=[8,13,18];
+          const notifTimes=[8,13,18]; // 8 AM, 1 PM, 6 PM IST
           const currentHour = now.getHours();
 
-          // Helper to check if a notification should be sent for the current hour (8 AM, 1 PM, 6 PM)
-          const isNotificationTime = notifTimes.includes(currentHour);
-
           // Only proceed if it is one of the scheduled hours
+          const isNotificationTime = notifTimes.includes(currentHour);
           if (!isNotificationTime) return;
           
-          // REMINDERS: Check if category is ON
-          if(appData.notifReminders) {
-            appData.reminders.forEach(r=>{
-              const diff=daysLeft(r.endDate);
-              if(diff===0||diff===1||diff<0){
-                  new Notification("Reminder Alert!", {
-                    body: `${r.title} - ${diff<0?'Expired':diff===0?'Today':'1 day left'}`,
-                    icon:'assets/icon.png'
-                  });
-              }
-            });
+          // --- Start Building Composite Notification Body ---
+
+          let notificationBody = "Home Screen Summary:\n\n";
+          let shouldSendNotification = false; // Only send if at least one category is enabled
+
+          // 1. REMINDERS Summary
+          if (appData.notifReminders) {
+              notificationBody += "⚠️ REMINDERS (Due Today/Tomorrow):\n";
+              notificationBody += buildReminderSummary() + "\n\n";
+              shouldSendNotification = true;
           }
 
-          // CHECKLIST: Check if category is ON
-          if(appData.notifChecklist) {
-            const openChecks = appData.checklists.filter(c => c.status === 'open');
-            if (openChecks.length > 0) {
-                 new Notification("Checklist Alert!", {
-                    body: `You have ${openChecks.length} open checklist(s). Time to check them off!`,
-                    icon:'assets/icon.png'
-                  });
-            }
+          // 2. CHECKLIST Summary
+          if (appData.notifChecklist) {
+              notificationBody += "✒ CHECKLIST (Open):\n";
+              notificationBody += buildChecklistSummary() + "\n\n";
+              shouldSendNotification = true;
           }
 
-          // BUDGET: Check if category is ON
-          if(appData.notifBudget) {
-            appData.budget.forEach(b => {
-                const days = daysBetween(b.startDate, b.endDate);
-                const costPerDay = calculateCostPerDay(b.amount, b.startDate, b.endDate);
-
-                // Only notify if a budget is active (days > 0) and cost is calculated
-                if (days > 0 && costPerDay > 0) {
-                    new Notification("Budget Tracker", {
-                        body: `Budget: ${b.title}. Recommended spend today: ₹${costPerDay}. ${days} days remaining.`,
-                        icon:'assets/icon.png'
-                    });
-                }
-            });
+          // 3. BUDGET Summary
+          if (appData.notifBudget) {
+              notificationBody += "💰 BUDGET Overview:\n";
+              notificationBody += buildBudgetSummary() + "\n\n";
+              shouldSendNotification = true;
           }
 
-          // NOTES: (Future feature reminder)
-          if(appData.notifNotes && currentHour === 18) { // Only notify for Notes in the Evening (6 PM)
-              new Notification("Notes Sync Reminder", {
-                  body: "Remember to review and backup your important notes!",
-                  icon:'assets/icon.png'
+          // 4. NOTES: General sync reminder (only at 6 PM)
+          if (appData.notifNotes && currentHour === 18) {
+              notificationBody += "📝 NOTES: Remember to review and backup your notes!";
+              shouldSendNotification = true;
+          }
+          
+          // --- Send Single Comprehensive Notification ---
+          
+          if (shouldSendNotification) {
+              new Notification("Nothing Reminder - Home Overview", {
+                  body: notificationBody,
+                  icon: 'assets/icon.png',
+                  // Use requireInteraction for a non-dismissible-like notification
+                  requireInteraction: true 
               });
           }
         }
@@ -1946,7 +1987,7 @@
         if ("Notification" in window) {
             updateBrowserPermissionUI();
             checkNotifications();
-            // Start the periodic check for notifications
+            // Start the periodic check for notifications (every 5 minutes)
             setInterval(checkNotifications, 5 * 60 * 1000);
         }
 
