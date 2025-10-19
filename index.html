@@ -2435,7 +2435,20 @@
                   // Start the periodic check for notifications (every 5 minutes)
                   setInterval(checkNotifications, 5 * 60 * 1000);
               }
-
+document.getElementById('requestPermissionBtn').addEventListener('click', async () => {
+  if (!('Notification' in window)) {
+    alert('Notifications not supported by this browser.');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  document.getElementById('browserPermissionText').textContent = perm;
+  if (perm === 'granted') {
+    new Notification('Test notification', {
+      body: 'This is a test. The page must be open to see it.',
+      icon: 'assets/icon.png'
+    });
+  }
+});
               // ---------- End Initial Render Code ----------
 
             })();
