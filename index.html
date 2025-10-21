@@ -6,232 +6,229 @@
     <title>Nothing Reminder</title>
     <link rel="icon" type="image/png" href="assets/icon.png" />
     <style>
-        :root {
-          --bg: #ffffff;
-          --text: #000000;
-          --muted: #666;
-          --accent: #4CAF50;
-        }
-        * { box-sizing: border-box; }
-        body {
-          margin: 0;
-          font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica          Neue", Arial;
-          background: var(--bg);
-          color: var(--text);
-        }
-        .sidebar {
-          width: 220px;
-          background: #666;
-          color: #fff;
-          position: fixed;
-          height: 100%;
-          left: 0;
-          display: flex;
-          flex-direction: column;
-          padding: 12px;
-          gap: 8px;
-          transition: left 0s;
-        }
-        .profile {
-          display:flex;
-          align-items:center;
-          gap:18px;
-          margin-bottom:8px;
-        }
-        .menu-btn, .icon-btn, .add-btn {
-          display:block;
-          width:100%;
-          padding:10px;
-          border: none;
-          background:#888;
-          font-style: Italic;
-          color:#fff;
-          border-radius:6px;
-          cursor:pointer;
-          text-align:left;
-          font-size:15px;
-          transition: left 0s;
-        }
-        .menu-btn:hover, .icon-btn:hover, .add-btn:hover { background:#aaa; }
-        .main {
-          margin-left: 220px;
-          padding: 20px;
-          min-height: 100vh;
-          transition: margin-left 0s;
-        }
-        .page.hidden { display:none; }
-        .toggle-btn {
-          position: absolute;
-          left: 210px; /* Adjusted to show partial icon */
-          top: 12px;
-          padding:6px 8px;
-          border-radius:8px;
-          border:none;
-          background:#ddd;
-          cursor:pointer;
-          transition: left 0s;
-          z-index: 10;
-          width: 20px; /* Make it smaller to show partial icon */
-          height: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .list { list-style:none; padding:0; margin:0 0 12px 0; }
-        .list li {
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-          padding:8px;
-          border-radius:6px;
-          margin-bottom:8px;
-          background: rgba(0,0,0,0.03);
-          transition: left 0s;
-        }
-        .item-left { display:flex; flex-direction:column; gap:4px; }
-        .badge { background:#eee; padding:4px 8px; border-radius:12px;
-          font-size:12px; }
-        .form {
-          margin-top: 0;
-          padding: 12px;
-          border-radius: 8px;
-          background: #f5f5f5;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          max-width: 520px;
-          overflow: hidden;
-          transition: max-height 0s ease, padding 0s ease;
-          max-height: 0;
-          padding-top: 0;
-          padding-bottom: 0;
-          transition: left 0s;
-        }
-        .form.visible {
-          max-height: 500px;
-          padding-top: 12px;
-          padding-bottom: 12px;
-        }
-        .form label {
-          display:flex;
-          flex-direction:column;
-          font-size:13px;
-          gap:6px;
-          transition: left 0s;
-        }
-        .form input[type="text"], .form input[type="date"], .form textarea,          .form select {
-          padding:8px;
-          border-radius:6px;
-          border:1px solid #ccc;
-          transition: left 0s;
-        }
-        .form-actions {
-          display:flex;
-          gap:8px;
-          margin-top:6px;
-          transition: left 0s;
-        }
-        .primary {
-          background: var(--accent);
-          color: #fff;
-          border:none;
-          padding:8px 12px;
-          border-radius:6px;
-          cursor:pointer;
-        }
-        .secondary {
-          background:#ddd;
-          border:none;
-          padding:8px 12px;
-          border-radius:6px;
-          cursor:pointer;
-        }
-        .icon-small {
-          background:transparent;
-          border:none;
-          cursor:pointer;
-          margin-left:8px;
-          font-size:16px;
-        }
-        .add-area {
-          margin-top: 8px;
-          max-width: 520px;
-        }
-        .dark {
-          --bg: #121212;
-          --text: #f1f1f1;
-        }
-        .dark .main { background:#151515; color:var(--text); }
-        .dark .form { background: #232323; }
-        .dark .menu-btn, .dark .icon-btn { background:#333; color:var(--text);       }
+            :root {
+              --bg: #ffffff;
+              --text: #000000;
+              --muted: #666;
+              --accent: #4CAF50;
+            }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica          Neue", Arial;
+              background: var(--bg);
+              color: var(--text);
+            }
+            .sidebar {
+              width: 220px;
+              background: #666;
+              color: #fff;
+              position: fixed;
+              height: 100%;
+              left: 0;
+              display: flex;
+              flex-direction: column;
+              padding: 12px;
+              gap: 8px;
+              transition: left 0s;
+            }
+            .profile {
+              display:flex;
+              align-items:center;
+              gap:18px;
+              margin-bottom:8px;
+            }
+            .menu-btn, .icon-btn, .add-btn {
+              display:block;
+              width:100%;
+              padding:10px;
+              border: none;
+              background:#888;
+              font-style: Italic;
+              color:#fff;
+              border-radius:6px;
+              cursor:pointer;
+              text-align:left;
+              font-size:15px;
+              transition: left 0s;
+            }
+            .menu-btn:hover, .icon-btn:hover, .add-btn:hover { background:#aaa; }
+            .main {
+              margin-left: 220px;
+              padding: 20px;
+              min-height: 100vh;
+              transition: margin-left 0s;
+            }
+            .page.hidden { display:none; }
+            .toggle-btn {
+              position: absolute;
+              left: 210px; /* Adjusted to show partial icon */
+              top: 12px;
+              padding:6px 8px;
+              border-radius:8px;
+              border:none;
+              background:#ddd;
+              cursor:pointer;
+              transition: left 0s;
+              z-index: 10;
+              width: 20px; /* Make it smaller to show partial icon */
+              height: 20px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .list { list-style:none; padding:0; margin:0 0 12px 0; }
+            .list li {
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              padding:8px;
+              border-radius:6px;
+              margin-bottom:8px;
+              background: rgba(0,0,0,0.03);
+              transition: left 0s;
+            }
+            .item-left { display:flex; flex-direction:column; gap:4px; }
+            .badge { background:#eee; padding:4px 8px; border-radius:12px;
+              font-size:12px; }
+            .form {
+              margin-top: 0;
+              padding: 12px;
+              border-radius: 8px;
+              background: #f5f5f5;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              max-width: 520px;
+              overflow: hidden;
+              transition: max-height 0s ease, padding 0s ease;
+              max-height: 0;
+              padding-top: 0;
+              padding-bottom: 0;
+              transition: left 0s;
+            }
+            .form.visible {
+              max-height: 500px;
+              padding-top: 12px;
+              padding-bottom: 12px;
+            }
+            .form label {
+              display:flex;
+              flex-direction:column;
+              font-size:13px;
+              gap:6px;
+              transition: left 0s;
+            }
+            .form input[type="text"], .form input[type="date"], .form textarea,          .form select {
+              padding:8px;
+              border-radius:6px;
+              border:1px solid #ccc;
+              transition: left 0s;
+            }
+            .form-actions {
+              display:flex;
+              gap:8px;
+              margin-top:6px;
+              transition: left 0s;
+            }
+            .primary {
+              background: var(--accent);
+              color: #fff;
+              border:none;
+              padding:8px 12px;
+              border-radius:6px;
+              cursor:pointer;
+            }
+            .secondary {
+              background:#ddd;
+              border:none;
+              padding:8px 12px;
+              border-radius:6px;
+              cursor:pointer;
+            }
+            .icon-small {
+              background:transparent;
+              border:none;
+              cursor:pointer;
+              margin-left:8px;
+              font-size:16px;
+            }
+            .add-area {
+              margin-top: 8px;
+              max-width: 520px;
+            }
+            .dark {
+              --bg: #121212;
+              --text: #f1f1f1;
+            }
+            .dark .main { background:#151515; color:var(--text); }
+            .dark .form { background: #232323; }
+            .dark .menu-btn, .dark .icon-btn { background:#333; color:var(--text);       }
 
-        /* Settings panel styles */
-        .settings-panel {
-          display: none;
-          flex-direction: column;
-          gap: 8px;
-          margin-top: 8px;
-        }
-        .settings-panel.visible { display: flex; }
+            /* Settings panel styles */
+            .settings-panel {
+              display: none;
+              flex-direction: column;
+              gap: 8px;
+              margin-top: 8px;
+            }
+            .settings-panel.visible { display: flex; }
 
-        /* Consistent button styling for all sections */
-        #showAddFormBtn, #homeRemindersToggle, #showAddNoteBtn,                      #viewNotesToggle, #homeNotesToggle,
-        #homeBudgetsToggle, #homeCheckToggle, #showAddBudgetBtn,                     #viewbudgetToggle, #showAddCheckBtn,
-        #viewCheckToggle, #viewRemindersToggle, #monthlyCalendarToggle,              #calculatorToggle, #viewHistoryToggle {
-          position: relative;
-          user-select: none;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-weight: 600;
-          font-size: 15px;
-          cursor: pointer;
-          transition: left 0s;
-          padding: 10px;
-          border: none;
-          background: #888;
-          color: #fff;
-          border-radius: 6px;
-          text-align: left;
-        }
+            /* Consistent button styling for all sections */
+            #showAddFormBtn, #homeRemindersToggle, #showAddNoteBtn, #viewNotesToggle, #homeNotesToggle,
+            #homeBudgetsToggle, #homeCheckToggle, #showAddBudgetBtn,#viewbudgetToggle, #showAddCheckBtn,
+            #viewCheckToggle, #viewRemindersToggle, #monthlyCalendarToggle,#calculatorToggle, #viewHistoryToggle {
+              position: relative;
+              user-select: none;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-weight: 600;
+              font-size: 15px;
+              cursor: pointer;
+              transition: left 0s;
+              padding: 10px;
+              border: none;
+              background: #888;
+              color: #fff;
+              border-radius: 6px;
+              text-align: left;
+            }
 
-        #showAddFormBtn:hover, #homeRemindersToggle:hover,                           #showAddNoteBtn:hover, #viewNotesToggle:hover,
-        #homeNotesToggle:hover, #homeBudgetsToggle:hover,                            #homeCheckToggle:hover, #showAddBudgetBtn:hover,
-        #viewbudgetToggle:hover, #showAddCheckBtn:hover,                             #viewCheckToggle:hover, #viewRemindersToggle:hover {
-          background: #aaa;
-        }
+            #showAddFormBtn:hover, #homeRemindersToggle:hover, #showAddNoteBtn:hover, #viewNotesToggle:hover,
+            #homeNotesToggle:hover, #homeBudgetsToggle:hover, #homeCheckToggle:hover, #showAddBudgetBtn:hover,
+            #viewbudgetToggle:hover, #showAddCheckBtn:hover,#viewCheckToggle:hover, #viewRemindersToggle:hover {
+              background: #aaa;
+            }
 
-        #showAddFormBtn.open .arrow, #homeRemindersToggle.open .arrow,               #showAddNoteBtn.open .arrow,
-        #viewNotesToggle.open .arrow, #homeNotesToggle.open .arrow,                  #homeBudgetsToggle.open .arrow,
-        #homeCheckToggle.open .arrow, #showAddBudgetBtn.open .arrow,                 #viewbudgetToggle.open .arrow,
-        #showAddCheckBtn.open .arrow, #viewCheckToggle.open .arrow,                  #viewRemindersToggle.open .arrow {
-          transform: rotate(180deg);
-          transition: left 0s;
-        }
+            #showAddFormBtn.open .arrow, #homeRemindersToggle.open .arrow,#showAddNoteBtn.open .arrow,
+            #viewNotesToggle.open .arrow, #homeNotesToggle.open .arrow,#homeBudgetsToggle.open .arrow,
+            #homeCheckToggle.open .arrow, #showAddBudgetBtn.open .arrow,#viewbudgetToggle.open .arrow,
+            #showAddCheckBtn.open .arrow, #viewCheckToggle.open .arrow,#viewRemindersToggle.open .arrow {
+              transform: rotate(180deg);
+              transition: left 0s;
+            }
 
-        /* Add this to your existing <style> block */
+            /* Add this to your existing <style> block */
       .calendar-day {
-          padding: 20px 40px;
-          border: 10px transparent #eee;
-          height: 10px;
-          width:  10px;
+          padding: 8px 4px;
+          border: 1px solid #eee;
+          height: 40px;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: default;
-        }
+      }
       .calendar-day.today {
           background: var(--accent);
           color: white;
           font-weight: bold;
-          border-radius: 600px;
-          height: 1px;
-          width: 1px;
-        }
+          border-radius: 50%;
+      }
       .calendar-day.spacer {
           background: transparent;
           border: none;
-        }
+      }
       .calculator-mode.hidden { display: none; }
       .normal-btn {
           padding: 10px;
@@ -239,130 +236,130 @@
           border: none;
           border-radius: 6px;
           cursor: pointer;
-        }
+      }
       .normal-btn.primary { background: #e0e0e0; color: #000; }
       .normal-btn.secondary { background: #ccc; color: #000; }
 
-        /* Scrollable lists */
-        .scrollable-list {
-          max-height: 300px;
-          overflow-y: auto;
-          border: 1px solid #ccc;
-          border-radius: 6px;
-          padding: 8px;
-          margin-top: 8px;
-        }
+            /* Scrollable lists */
+            .scrollable-list {
+              max-height: 300px;
+              overflow-y: auto;
+              border: 1px solid #ccc;
+              border-radius: 6px;
+              padding: 8px;
+              margin-top: 8px;
+            }
 
-        /* Scrollbar styling */
-        .scrollable-list::-webkit-scrollbar {
-          width: 8px;
-          border-radius: 4px;
-        }
+            /* Scrollbar styling */
+            .scrollable-list::-webkit-scrollbar {
+              width: 8px;
+              border-radius: 4px;
+            }
 
-        .scrollable-list::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 4px;
-        }
+            .scrollable-list::-webkit-scrollbar-track {
+              background: #f1f1f1;
+              border-radius: 4px;
+            }
 
-        .scrollable-list::-webkit-scrollbar-thumb {
-          background: #888;
-          border-radius: 4px;
-        }
+            .scrollable-list::-webkit-scrollbar-thumb {
+              background: #888;
+              border-radius: 4px;
+            }
 
-        .scrollable-list::-webkit-scrollbar-thumb:hover {
-          background: #555;
-          border-radius: 4px;
-        }
+            .scrollable-list::-webkit-scrollbar-thumb:hover {
+              background: #555;
+              border-radius: 4px;
+            }
 
-        /* Checklist status button */
-        .status-btn {
-          background: #007bff;
-          color: white;
-          border: none;
-          padding: 4px 8px;
-          border-radius: 4px;
-          cursor: pointer;
-          margin-right: 8px;
-          font-size: 12px;
-        }
+            /* Checklist status button */
+            .status-btn {
+              background: #007bff;
+              color: white;
+              border: none;
+              padding: 4px 8px;
+              border-radius: 4px;
+              cursor: pointer;
+              margin-right: 8px;
+              font-size: 12px;
+            }
 
-        /* Branding footer */
-        .branding-footer {
-          position: fixed;
-          bottom: 10px;
-          left: 50%;
-          transform: translateX(-50%);
-          font-size: 12px;
-          color: #666;
-          text-align: center;
-        }
+            /* Branding footer */
+            .branding-footer {
+              position: fixed;
+              bottom: 10px;
+              left: 50%;
+              transform: translateX(-50%);
+              font-size: 12px;
+              color: #666;
+              text-align: center;
+            }
 
-        .branding-footer a {
-          color: #666;
-          text-decoration: none;
-        }
+            .branding-footer a {
+              color: #666;
+              text-decoration: none;
+            }
 
-        /* Notification Page Specific Styles */
-        .notif-status-box {
-          padding: 15px;
-          border-radius: 8px;
-          margin-bottom: 20px;
-          background: #e0f7fa;
-          border: 1px solid #b2ebf2;
-        }
-        .notif-status-box.denied {
-          background: #ffebee;
-          border: 1px solid #ffcdd2;
-        }
-        .notif-setting-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 10px 0;
-          border-bottom: 1px solid #eee;
-        }
-        .notif-setting-item:last-child {
-          border-bottom: none;
-        }
-        .toggle-switch {
-          position: relative;
-          display: inline-block;
-          width: 50px;
-          height: 24px;
-        }
-        .toggle-switch input {
-          opacity: 0;
-          width: 0;
-          height: 0;
-        }
-        .slider {
-          position: absolute;
-          cursor: pointer;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: #ccc;
-          transition: 0.4s;
-          border-radius: 24px;
-        }
-        .slider:before {
-          position: absolute;
-          content: "";
-          height: 16px;
-          width: 16px;
-          left: 4px;
-          bottom: 4px;
-          background-color: white;
-          transition: 0.4s;
-          border-radius: 50%;
-        }
-        input:checked + .slider {
-          background-color: var(--accent);
-        }
-        input:checked + .slider:before {
-          transform: translateX(26px);
-        }
+            /* Notification Page Specific Styles */
+            .notif-status-box {
+              padding: 15px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+              background: #e0f7fa;
+              border: 1px solid #b2ebf2;
+            }
+            .notif-status-box.denied {
+              background: #ffebee;
+              border: 1px solid #ffcdd2;
+            }
+            .notif-setting-item {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 10px 0;
+              border-bottom: 1px solid #eee;
+            }
+            .notif-setting-item:last-child {
+              border-bottom: none;
+            }
+            .toggle-switch {
+              position: relative;
+              display: inline-block;
+              width: 50px;
+              height: 24px;
+            }
+            .toggle-switch input {
+              opacity: 0;
+              width: 0;
+              height: 0;
+            }
+            .slider {
+              position: absolute;
+              cursor: pointer;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background-color: #ccc;
+              transition: 0.4s;
+              border-radius: 24px;
+            }
+            .slider:before {
+              position: absolute;
+              content: "";
+              height: 16px;
+              width: 16px;
+              left: 4px;
+              bottom: 4px;
+              background-color: white;
+              transition: 0.4s;
+              border-radius: 50%;
+            }
+            input:checked + .slider {
+              background-color: var(--accent);
+            }
+            input:checked + .slider:before {
+              transform: translateX(26px);
+            }
     </style>
   </head>
   <body>
@@ -1875,53 +1872,128 @@
                 }
               });
 
-              // ---------- NEW: Notification Settings Logic ----------
-              function updateBrowserPermissionUI() {
-                  const status = Notification.permission;
-                  const textEl = byId('browserPermissionText');
-                  const boxEl = byId('globalNotifStatus');
-                  const btnEl = byId('requestPermissionBtn');
+// -----------------------------------------------------------
+        // ---------- FIXED NOTIFICATION LOGIC (HIGH PRIORITY) ---------
+        // -----------------------------------------------------------
 
-                  boxEl.classList.remove('denied');
+        function updateBrowserPermissionUI() {
+            // Your existing logic to update notification permission UI
+        }
 
-                  if (status === 'granted') {
-                      textEl.innerHTML = 'Status: <b style="color: var(--accent);">Granted (ON)</b>';
-                      btnEl.textContent = 'Permission Granted';
-                      btnEl.disabled = true;
-                  } else if (status === 'denied') {
-                      textEl.innerHTML = 'Status: <b style="color: #f44336;">Denied (OFF)</b>. Please change in browser settings.';
-                      btnEl.textContent = 'Permission Denied';
-                      btnEl.disabled = true;
-                      boxEl.classList.add('denied');
-                  } else { // 'default' or not supported
-                      textEl.innerHTML = 'Status: <b style="color: #ff9800;">Not Requested (OFF)</b>';
-                      btnEl.textContent = 'Request Permission';
-                      btnEl.disabled = false;
-                  }
-              }
-
-              function requestNotificationPermission() {
-                if (!("Notification" in window)) {
-                    console.error("This browser does not support desktop notification");
-                    return;
-                }
-                if (Notification.permission === 'granted' || Notification.permission === 'denied') {
-                   updateBrowserPermissionUI();
-                   return;
-                }
-
-                Notification.requestPermission().then(function(permission) {
+        function requestNotificationPermission() {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
                     updateBrowserPermissionUI();
+                    checkNotifications(); // Check immediately after granting permission
+                }
+            });
+        }
+
+        /**
+         * Core function to display a notification with high-priority options.
+         * Sets requireInteraction: true to make it non-dismissible until clicked.
+         * @param {string} title - The notification title.
+         * @param {Object} options - Notification options.
+         */
+        function showNotification(title, options) {
+            if (Notification.permission === "granted") {
+                const notification = new Notification(title, {
+                    body: options.body,
+                    icon: options.icon || 'assets/icon.png',
+                    // CRUCIAL: Makes it non-dismissible until user interacts
+                    requireInteraction: true, 
+                    tag: options.tag,         
+                    silent: false,            // Ensures sound/vibration
+                    vibrate: [200, 100, 200]  // Standard mobile vibration pattern
                 });
-              }
 
-              function renderNotificationPage() {
-                  if (!("Notification" in window)) {
-                      byId('globalNotifStatus').innerHTML = '<h3>Browser Permission</h3><p style="color: #f44336;">Notifications are not supported by your browser.</p>';
-                      return;
-                  }
+                // Close notification and focus the app window on click
+                notification.onclick = function () {
+                    window.focus(); 
+                    this.close();   
+                };
+            }
+        }
+        
+        /**
+         * Checks all data sources for due events and marks them as notified.
+         * IMPORTANT: This function modifies appData (setting isNotified = true) 
+         * and calls saveAll() to persist the state.
+         */
+        function getPendingEvents() {
+            const now = Date.now();
+            const pending = [];
 
-                  updateBrowserPermissionUI();
+            // 1. Check Reminders
+            appData.reminders.forEach(r => {
+                if (!appData.notifReminders) return; 
+                const dueTime = new Date(r.dateTime).getTime();
+                // Check if due, and not yet notified (assuming a default isNotified: false)
+                if (dueTime <= now && !r.isNotified) {
+                    pending.push({
+                        title: '⏰ Reminder Due!',
+                        body: r.text,
+                        tag: 'reminder-' + appData.reminders.indexOf(r),
+                        type: 'reminder',
+                    });
+                    r.isNotified = true; // Mark as notified
+                }
+            });
+            
+            // 2. Check Checklist Items 
+            appData.checklists.forEach(list => {
+                if (!appData.notifChecklist) return;
+                list.items.forEach(item => {
+                    if (item.dateTime && !item.isDone) {
+                        const dueTime = new Date(item.dateTime).getTime();
+                        if (dueTime <= now && !item.isNotified) {
+                            pending.push({
+                                title: '✅ Checklist Item Due!',
+                                body: item.text + ' in ' + list.title,
+                                tag: 'checklist-' + list.id + '-' + item.id,
+                                type: 'checklist',
+                            });
+                            item.isNotified = true; // Mark as notified
+                        }
+                    }
+                });
+            });
+
+            // Note: Add logic for Notes/Budget here if they are time-sensitive.
+
+            if (pending.length > 0) {
+                saveAll(); // Save the new 'isNotified' states immediately
+            }
+            
+            return pending;
+        }
+
+        /**
+         * Main function to check and dispatch summary notification.
+         * This function is intended to run once on page load.
+         */
+        function checkNotifications() {
+            if (Notification.permission !== "granted") return;
+
+            const pendingEvents = getPendingEvents();
+            
+            if (pendingEvents.length > 0) {
+                let reminderCount = pendingEvents.filter(e => e.type === 'reminder').length;
+                let checklistCount = pendingEvents.filter(e => e.type === 'checklist').length;
+                
+                const totalCount = pendingEvents.length;
+                let summaryBody = `You have ${totalCount} pending items.`;
+                if (reminderCount > 0) summaryBody += ` ${reminderCount} reminders.`;
+                if (checklistCount > 0) summaryBody += ` ${checklistCount} checklist items.`;
+
+
+                // Show one non-dismissible summary notification
+                showNotification(`🔔 Attention: ${totalCount} Due Events`, {
+                    body: summaryBody,
+                    tag: 'due-events-summary',
+                });
+            }
+        
 
                   // Setup custom category toggles based on appData
                   byId('toggleReminders').checked = appData.notifReminders;
@@ -2428,27 +2500,14 @@
               switchCalculatorMode();
               // ... rest of the initial render code ...
 
-              // 3. Setup notifications and periodic check
+             // 3. Setup notifications and periodic check
               if ("Notification" in window) {
                   updateBrowserPermissionUI();
                   checkNotifications();
-                  // Start the periodic check for notifications (every 5 minutes)
-                  setInterval(checkNotifications, 5 * 60 * 1000);
+                  // Start the periodic check for notifications (NO INTERVAL, check only on load)
+                  // The line setInterval(checkNotifications, ...) is now REMOVED
               }
-document.getElementById('requestPermissionBtn').addEventListener('click', async () => {
-  if (!('Notification' in window)) {
-    alert('Notifications not supported by this browser.');
-    return;
-  }
-  const perm = await Notification.requestPermission();
-  document.getElementById('browserPermissionText').textContent = perm;
-  if (perm === 'granted') {
-    new Notification('Test notification', {
-      body: 'This is a test. The page must be open to see it.',
-      icon: 'assets/icon.png'
-    });
-  }
-});
+
               // ---------- End Initial Render Code ----------
 
             })();
