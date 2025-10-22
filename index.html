@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -1872,128 +1873,53 @@
                 }
               });
 
-// -----------------------------------------------------------
-        // ---------- FIXED NOTIFICATION LOGIC (HIGH PRIORITY) ---------
-        // -----------------------------------------------------------
+              // ---------- NEW: Notification Settings Logic ----------
+              function updateBrowserPermissionUI() {
+                  const status = Notification.permission;
+                  const textEl = byId('browserPermissionText');
+                  const boxEl = byId('globalNotifStatus');
+                  const btnEl = byId('requestPermissionBtn');
 
-        function updateBrowserPermissionUI() {
-            // Your existing logic to update notification permission UI
-        }
+                  boxEl.classList.remove('denied');
 
-        function requestNotificationPermission() {
-            Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
+                  if (status === 'granted') {
+                      textEl.innerHTML = 'Status: <b style="color: var(--accent);">Granted (ON)</b>';
+                      btnEl.textContent = 'Permission Granted';
+                      btnEl.disabled = true;
+                  } else if (status === 'denied') {
+                      textEl.innerHTML = 'Status: <b style="color: #f44336;">Denied (OFF)</b>. Please change in browser settings.';
+                      btnEl.textContent = 'Permission Denied';
+                      btnEl.disabled = true;
+                      boxEl.classList.add('denied');
+                  } else { // 'default' or not supported
+                      textEl.innerHTML = 'Status: <b style="color: #ff9800;">Not Requested (OFF)</b>';
+                      btnEl.textContent = 'Request Permission';
+                      btnEl.disabled = false;
+                  }
+              }
+
+              function requestNotificationPermission() {
+                if (!("Notification" in window)) {
+                    console.error("This browser does not support desktop notification");
+                    return;
+                }
+                if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+                   updateBrowserPermissionUI();
+                   return;
+                }
+
+                Notification.requestPermission().then(function(permission) {
                     updateBrowserPermissionUI();
-                    checkNotifications(); // Check immediately after granting permission
-                }
-            });
-        }
-
-        /**
-         * Core function to display a notification with high-priority options.
-         * Sets requireInteraction: true to make it non-dismissible until clicked.
-         * @param {string} title - The notification title.
-         * @param {Object} options - Notification options.
-         */
-        function showNotification(title, options) {
-            if (Notification.permission === "granted") {
-                const notification = new Notification(title, {
-                    body: options.body,
-                    icon: options.icon || 'assets/icon.png',
-                    // CRUCIAL: Makes it non-dismissible until user interacts
-                    requireInteraction: true, 
-                    tag: options.tag,         
-                    silent: false,            // Ensures sound/vibration
-                    vibrate: [200, 100, 200]  // Standard mobile vibration pattern
                 });
+              }
 
-                // Close notification and focus the app window on click
-                notification.onclick = function () {
-                    window.focus(); 
-                    this.close();   
-                };
-            }
-        }
-        
-        /**
-         * Checks all data sources for due events and marks them as notified.
-         * IMPORTANT: This function modifies appData (setting isNotified = true) 
-         * and calls saveAll() to persist the state.
-         */
-        function getPendingEvents() {
-            const now = Date.now();
-            const pending = [];
+              function renderNotificationPage() {
+                  if (!("Notification" in window)) {
+                      byId('globalNotifStatus').innerHTML = '<h3>Browser Permission</h3><p style="color: #f44336;">Notifications are not supported by your browser.</p>';
+                      return;
+                  }
 
-            // 1. Check Reminders
-            appData.reminders.forEach(r => {
-                if (!appData.notifReminders) return; 
-                const dueTime = new Date(r.dateTime).getTime();
-                // Check if due, and not yet notified (assuming a default isNotified: false)
-                if (dueTime <= now && !r.isNotified) {
-                    pending.push({
-                        title: '⏰ Reminder Due!',
-                        body: r.text,
-                        tag: 'reminder-' + appData.reminders.indexOf(r),
-                        type: 'reminder',
-                    });
-                    r.isNotified = true; // Mark as notified
-                }
-            });
-            
-            // 2. Check Checklist Items 
-            appData.checklists.forEach(list => {
-                if (!appData.notifChecklist) return;
-                list.items.forEach(item => {
-                    if (item.dateTime && !item.isDone) {
-                        const dueTime = new Date(item.dateTime).getTime();
-                        if (dueTime <= now && !item.isNotified) {
-                            pending.push({
-                                title: '✅ Checklist Item Due!',
-                                body: item.text + ' in ' + list.title,
-                                tag: 'checklist-' + list.id + '-' + item.id,
-                                type: 'checklist',
-                            });
-                            item.isNotified = true; // Mark as notified
-                        }
-                    }
-                });
-            });
-
-            // Note: Add logic for Notes/Budget here if they are time-sensitive.
-
-            if (pending.length > 0) {
-                saveAll(); // Save the new 'isNotified' states immediately
-            }
-            
-            return pending;
-        }
-
-        /**
-         * Main function to check and dispatch summary notification.
-         * This function is intended to run once on page load.
-         */
-        function checkNotifications() {
-            if (Notification.permission !== "granted") return;
-
-            const pendingEvents = getPendingEvents();
-            
-            if (pendingEvents.length > 0) {
-                let reminderCount = pendingEvents.filter(e => e.type === 'reminder').length;
-                let checklistCount = pendingEvents.filter(e => e.type === 'checklist').length;
-                
-                const totalCount = pendingEvents.length;
-                let summaryBody = `You have ${totalCount} pending items.`;
-                if (reminderCount > 0) summaryBody += ` ${reminderCount} reminders.`;
-                if (checklistCount > 0) summaryBody += ` ${checklistCount} checklist items.`;
-
-
-                // Show one non-dismissible summary notification
-                showNotification(`🔔 Attention: ${totalCount} Due Events`, {
-                    body: summaryBody,
-                    tag: 'due-events-summary',
-                });
-            }
-        
+                  updateBrowserPermissionUI();
 
                   // Setup custom category toggles based on appData
                   byId('toggleReminders').checked = appData.notifReminders;
@@ -2500,13 +2426,37 @@
               switchCalculatorMode();
               // ... rest of the initial render code ...
 
-             // 3. Setup notifications and periodic check
-              if ("Notification" in window) {
-                  updateBrowserPermissionUI();
-                  checkNotifications();
-                  // Start the periodic check for notifications (NO INTERVAL, check only on load)
-                  // The line setInterval(checkNotifications, ...) is now REMOVED
-              }
+            // Register the service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service Worker Registered'))
+        .catch(console.error);
+    }
+
+    // Show notification once on first load
+    async function showPersistentNotification() {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+
+      // Check if notification already shown
+      if (localStorage.getItem('notificationShown')) return;
+
+      navigator.serviceWorker.ready.then(registration => {
+        registration.showNotification('🚀 Constant Notification Active', {
+          body: 'This notification stays until you manually dismiss it.',
+          icon: 'https://cdn-icons-png.flaticon.com/512/190/190411.png',
+          badge: 'https://cdn-icons-png.flaticon.com/512/190/190411.png',
+          requireInteraction: true, // stays until manually closed
+          silent: false,
+          tag: 'constant-alert', // unique tag avoids duplication
+          renotify: false
+        });
+        localStorage.setItem('notificationShown', 'true');
+      });
+    }
+
+    // Run once app loads
+    window.addEventListener('load', showPersistentNotification);
 
               // ---------- End Initial Render Code ----------
 
