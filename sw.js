@@ -1,7 +1,5 @@
 // Listen for notification click event
-self.addEventListener('notificationclick', function(event) {
+self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(
-    clients.openWindow('https://spydernet3.github.io/Nothing-Reminder/')
-  );
+  event.waitUntil(clients.openWindow('https://spydernet3.github.io/Nothing-Reminder/'));
 });
