@@ -4,8 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Nothing Reminder</title>
-        <link rel="icon" type="image/png" href="assets/icon.png" />
-
+    <link rel="icon" type="image/png" href="assets/icon.png" />
     <style>
             :root {
               --bg: #ffffff;
@@ -16,7 +15,7 @@
             * { box-sizing: border-box; }
             body {
               margin: 0;
-              font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica          Neue", Arial;
+              font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
               background: var(--bg);
               color: var(--text);
             }
@@ -120,7 +119,7 @@
               gap:6px;
               transition: left 0s;
             }
-            .form input[type="text"], .form input[type="date"], .form textarea,          .form select {
+            .form input[type="text"], .form input[type="date"], .form textarea, .form select {
               padding:8px;
               border-radius:6px;
               border:1px solid #ccc;
@@ -164,7 +163,7 @@
             }
             .dark .main { background:#151515; color:var(--text); }
             .dark .form { background: #232323; }
-            .dark .menu-btn, .dark .icon-btn { background:#333; color:var(--text);       }
+            .dark .menu-btn, .dark .icon-btn { background:#333; color:var(--text); }
 
             /* Settings panel styles */
             .settings-panel {
@@ -361,6 +360,40 @@
             input:checked + .slider:before {
               transform: translateX(26px);
             }
+            
+            /* Static Notification Styles */
+            .static-notification {
+              padding: 15px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+              background: #fff3e0;
+              border: 1px solid #ffcc80;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .static-notification-content {
+              flex: 1;
+            }
+            .static-notification-actions {
+              display: flex;
+              gap: 8px;
+            }
+            .static-notification-btn {
+              padding: 6px 12px;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 14px;
+            }
+            .static-notification-btn.primary {
+              background: var(--accent);
+              color: white;
+            }
+            .static-notification-btn.secondary {
+              background: #ccc;
+              color: #000;
+            }
     </style>
   </head>
   <body>
@@ -421,6 +454,19 @@
 
       <div id="home" class="page">
         <h2>Home</h2>
+        
+        <!-- Static Notification Area -->
+        <div id="staticNotificationContainer" class="static-notification" style="display: none;">
+          <div class="static-notification-content">
+            <div id="notificationMessage">System requires restart</div>
+            <div id="notificationDetails">Antivirus is active</div>
+          </div>
+          <div class="static-notification-actions">
+            <button id="notificationActionBtn" class="static-notification-btn primary">Restart</button>
+            <button id="notificationDismissBtn" class="static-notification-btn secondary">Dismiss</button>
+          </div>
+        </div>
+        
         <div class="add-area">
           <button
             id="homeRemindersToggle"
@@ -691,8 +737,8 @@
         <hr />
         <h3>Version Info!</h3>
         <ul>
-          <p>Version 13.4.4</p>
-          <p>Last Updated: 19-Sep-2025</p>
+          <p>Version 13.4.5</p>
+          <p>Last Updated: 23-Sep-2025</p>
           <p>Project Type: Open source</p>
         </ul>
       </div>
@@ -1001,47 +1047,46 @@
           >
             <button class="menu-btn" style="width: 180px;">Notepad</button>
           </a>
+          <a
+            href="https://spydernet3.github.io/Smart-Card/"
+            target="_blank"
+            style="text-decoration: none; color: inherit;"
+          >
+            <button class="menu-btn" style="width: 180px;">Smart Card</button>
+          </a>
         </div>
       </div>
     </div>
 
     <script>
-            // --- CORRECTED Service Worker Registration ---
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', () => {
-                // Check for sw.js in the root directory
-                fetch('/sw.js', { method: 'HEAD' }) // <-- Corrected path
-                  .then(response => {
-                    // Check if file exists and has a valid JS content type
-                    const contentType = response.headers.get('content-type');
-                    if (response.ok && contentType && (contentType.includes('javascript') || contentType.includes('application/x-javascript'))) {
-                      return navigator.serviceWorker.register('/sw.js') // <-- Registers same path
-                        .then((registration) => {
-                          console.log('SW registered: ', registration);
-                        })
-                        .catch((error) => {
-                          console.log('SW registration failed: ', error);
-                        });
-                    } else {
-                       console.log('SW registration skipped: sw.js file not found or wrong MIME type.');
-                    }
-                  })
-                  .catch(error => {
-                    console.log('SW registration failed (network error): ', error);
-                  });
-              });
-            }
+            // Service Worker Registration - Removed for simplicity
+            // if ('serviceWorker' in navigator) {
+            //   window.addEventListener('load', () => {
+            //     fetch('/scripts/sw.js', { method: 'HEAD' })
+            //       .then(response => {
+            //         if (response.ok && response.headers.get('content-type').includes('javascript')) {
+            //           return navigator.serviceWorker.register('/sw.js')
+            //             .then((registration) => {
+            //               console.log('SW registered: ', registration);
+            //             })
+            //             .catch((error) => {
+            //               console.log('SW registration failed: ', error);
+            //             });
+            //         } else {
+            //            console.log('SW registration skipped: sw.js file not found or wrong MIME type.');
+            //         }
+            //       })
+            //       .catch(error => {
+            //         console.log('SW registration failed (network error): ', error);
+            //       });
+            //   });
+            // }
 
             (function () {
               // ---------- Storage ----------
 
               // Enhanced storage with quota handling
               const STORAGE_KEY = 'smart_reminder_app_v1';
-              
-              // --- NOTIFICATION TAG ---
-              // We give our persistent notification a unique name (tag)
-              // This lets us replace it and close it.
-              const NOTIFICATION_TAG = 'home-summary-notification';
 
               const defaultData = {
                 reminders: [],
@@ -1057,7 +1102,9 @@
                 notifChecklist: true,
                 notifBudget: true,
                 // NEW: Calculation History
-                calculationHistory: []
+                calculationHistory: [],
+                // NEW: Static Notification State
+                staticNotification: null
               };
 
               let appData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
@@ -1065,7 +1112,7 @@
               appData = { ...defaultData, ...appData };
               // Ensure new property is initialized if old data exists
               if (!appData.calculationHistory) appData.calculationHistory = [];
-
+              if (!appData.staticNotification) appData.staticNotification = null;
 
               let editingIndex = null;
               let editingBudgetIndex = null;
@@ -1087,15 +1134,10 @@
                   const dataStr = JSON.stringify(appData);
                   localStorage.setItem(STORAGE_KEY, dataStr);
                   console.log("Data saved successfully to localStorage.");
-                  
-                  // --- START OF NOTIFICATION CHANGE ---
-                  // Instead of a timer, we show/update the notification
-                  // every time the data is saved.
-                  showPersistentSummaryNotification();
-                  // --- END OF NOTIFICATION CHANGE ---
-                  
                   // Re-render the notification page whenever data changes
                   renderNotificationPage();
+                  // Re-render home page to update static notification
+                  renderHome();
                 } catch (err) {
                   console.error("Save failed:", err);
                   if (err.name === 'QuotaExceededError') {
@@ -1195,7 +1237,6 @@
                 const filteredReminders = appData.reminders.filter(r => {
                   const diff = daysLeft(r.endDate);
                   return diff === 0 || diff === 1 || diff < 0;
-                    
                 });
 
                 if(filteredReminders.length === 0){
@@ -1215,7 +1256,7 @@
                   else if(diff < 0){ badgeText='Expired'; }
                   else if(diff === 0){ badgeText='Today'; }
                   else{ badgeText=`${diff} days left`; }
-                  li.textContent = `\"${r.title}\" || ${badgeText}`;
+                  li.textContent = `"${r.title}" || ${badgeText}`;
                   frag.appendChild(li);
                 });
                 container.appendChild(frag);
@@ -1248,7 +1289,7 @@
                   if(n.isTable && n.text) {
                     // Show first few rows of table in home view
                     const lines = n.text.split('\n');
-                    let tableHTML = '<table border=\"1\" style=\"border-collapse: collapse; width: 100%;\">';
+                    let tableHTML = '<table border="1" style="border-collapse: collapse; width: 100%;">';
 
                     lines.forEach((line, index) => {
                       if(line.includes('---')) {
@@ -1259,9 +1300,9 @@
                         cells.forEach(cell => {
                           const cellContent = cell.trim();
                           if(index === 0) {
-                            tableHTML += `<th style=\"border: 1px solid #ddd; padding: 4px;\">${cellContent}</th>`;
+                            tableHTML += `<th style="border: 1px solid #ddd; padding: 4px;">${cellContent}</th>`;
                           } else {
-                            tableHTML += `<td style=\"border: 1px solid #ddd; padding: 4px;\">${cellContent}</td>`;
+                            tableHTML += `<td style="border: 1px solid #ddd; padding: 4px;">${cellContent}</td>`;
                           }
                         });
                       }
@@ -1270,7 +1311,7 @@
                     tableHTML += '</tr></table>';
                     text.innerHTML = tableHTML;
                   } else {
-                    text.innerHTML = `<b>${(n.text || '').substring(0, 50)}...</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
+                    text.innerHTML = `<b>${(n.text || '').substring(0, 50)}...</b><br><small style="opacity:0.7">${n.createdAt || ''}</small>`;
                   }
                   left.appendChild(text);
 
@@ -1311,7 +1352,7 @@
                   if(note.isTable && note.text) {
                     // Convert table format to HTML table
                     const lines = note.text.split('\n');
-                    let tableHTML = '<table border=\"1\" style=\"border-collapse: collapse; width: 100%;\">';
+                    let tableHTML = '<table border="1" style="border-collapse: collapse; width: 100%;">';
 
                     lines.forEach((line, index) => {
                       if(line.includes('---')) {
@@ -1324,9 +1365,9 @@
                         cells.forEach(cell => {
                           const cellContent = cell.trim();
                           if(index === 0) {
-                            tableHTML += `<th style=\"border: 1px solid #ddd; padding: 8px;\">${cellContent}</th>`;
+                            tableHTML += `<th style="border: 1px solid #ddd; padding: 8px;">${cellContent}</th>`;
                           } else {
-                            tableHTML += `<td style=\"border: 1px solid #ddd; padding: 8px;\">${cellContent}</td>`;
+                            tableHTML += `<td style="border: 1px solid #ddd; padding: 8px;">${cellContent}</td>`;
                           }
                         });
                       }
@@ -1336,7 +1377,7 @@
                     text.innerHTML = tableHTML;
                   } else {
                     text.innerHTML=`<b>${note.text||''}</b><br>
-                      <small style=\"opacity:0.7\">${note.createdAt||''}</small>`;
+                      <small style="opacity:0.7">${note.createdAt||''}</small>`;
                   }
                   left.appendChild(text);
 
@@ -1433,8 +1474,7 @@
                   const editBtn=document.createElement('button'); editBtn.className='icon-small'; editBtn.textContent='✏️'; editBtn.title='Edit'; editBtn.addEventListener('click',()=>editBudget(i));
                   const delBtn=document.createElement('button'); delBtn.className='icon-small'; delBtn.textContent='🗑️'; delBtn.title='Delete'; delBtn.addEventListener('click',()=>deleteBudget(i));
 
-                  right.appendChild(editBtn);
-                  right.appendChild(delBtn);
+                  right.appendChild(editBtn); right.appendChild(delBtn);
                   li.appendChild(left); li.appendChild(right); frag.appendChild(li);
                 });
                 list.appendChild(frag);
@@ -1462,7 +1502,7 @@
                   const days = daysBetween(b.startDate, b.endDate);
 
                   const li=document.createElement('li');
-                  li.textContent = `\"${b.title}\" || Total: ₹${b.amount} || Remaining: ${days} days || Cost: ₹${costPerDay}/day`;
+                  li.textContent = `"${b.title}" || Total: ₹${b.amount} || Remaining: ${days} days || Cost: ₹${costPerDay}/day`;
                   frag.appendChild(li);
                 });
                 container.appendChild(frag);
@@ -1712,7 +1752,7 @@
                 appData.checklists.forEach(check => {
                   if(check.status === 'open') {
                     const li = document.createElement('li');
-                    li.textContent = `\"${check.title}\" - ${check.items.length} items`;
+                    li.textContent = `"${check.title}" - ${check.items.length} items`;
                     frag.appendChild(li);
                   }
                 });
@@ -1746,7 +1786,7 @@
 
                   // Get the first 3 items or all items if less than 3
                   const previewItems = check.items.slice(0, 3);
-                  let itemsText = previewItems.map(item => `\u2022 ${item}`).join('<br>'); // \u2022 is a bullet point
+                  let itemsText = previewItems.map(item => `• ${item}`).join('<br>'); // • is a bullet point
 
                   // Add an ellipsis if there are more than 3 items
                   if(check.items.length > 3) {
@@ -1888,9 +1928,55 @@
                 }
               });
 
+              // ---------- NEW: Static Notification System ----------
+              function showStaticNotification(message, details, actionText, actionHandler) {
+                const container = byId('staticNotificationContainer');
+                const messageEl = byId('notificationMessage');
+                const detailsEl = byId('notificationDetails');
+                const actionBtn = byId('notificationActionBtn');
+                const dismissBtn = byId('notificationDismissBtn');
+                
+                messageEl.textContent = message;
+                detailsEl.textContent = details;
+                actionBtn.textContent = actionText;
+                
+                actionBtn.onclick = actionHandler;
+                dismissBtn.onclick = () => {
+                  container.style.display = 'none';
+                  appData.staticNotification = null;
+                  saveAll();
+                };
+                
+                container.style.display = 'flex';
+                appData.staticNotification = {
+                  message,
+                  details,
+                  actionText,
+                  actionHandler: actionHandler.toString()
+                };
+                saveAll();
+              }
+
+              function renderHome() {
+                // Render home page content
+                renderHomeReminders();
+                renderHomeNotes();
+                renderHomeBudgets();
+                renderHomeCheck();
+                
+                // Show static notification if exists
+                if (appData.staticNotification) {
+                  showStaticNotification(
+                    appData.staticNotification.message,
+                    appData.staticNotification.details,
+                    appData.staticNotification.actionText,
+                    eval(appData.staticNotification.actionHandler)
+                  );
+                }
+              }
+
               // ---------- NEW: Notification Settings Logic ----------
               function updateBrowserPermissionUI() {
-                  if (!("Notification" in window)) return; // Exit if notifications not supported
                   const status = Notification.permission;
                   const textEl = byId('browserPermissionText');
                   const boxEl = byId('globalNotifStatus');
@@ -1915,7 +2001,7 @@
               }
 
               function requestNotificationPermission() {
-                if (!("Notification" in window)) {
+                if (!(("Notification" in window))) {
                     console.error("This browser does not support desktop notification");
                     return;
                 }
@@ -1930,13 +2016,8 @@
               }
 
               function renderNotificationPage() {
-                  if (!("Notification" in window)) {
+                  if (!(("Notification" in window))) {
                       byId('globalNotifStatus').innerHTML = '<h3>Browser Permission</h3><p style="color: #f44336;">Notifications are not supported by your browser.</p>';
-                      // Disable toggles if notifications aren't supported
-                      byId('toggleReminders').disabled = true;
-                      byId('toggleNotes').disabled = true;
-                      byId('toggleChecklist').disabled = true;
-                      byId('toggleBudget').disabled = true;
                       return;
                   }
 
@@ -1952,158 +2033,10 @@
               // Function to handle custom toggle changes
               function handleCustomNotifToggle(category, event) {
                   appData[category] = event.target.checked;
-                  saveAll(); // This will automatically re-trigger the notification
+                  saveAll();
               }
 
-
-              // ---------- Notifications Logic (Updated for comprehensive summary) ----------
-
-              // Helper 1: Reminders (Today or Tomorrow)
-              function buildReminderSummary() {
-                  let summary = [];
-                  appData.reminders.forEach(r => {
-                      const diff = daysLeft(r.endDate);
-                      if (diff === 0 || diff === 1) { // Only Today or Tomorrow as per home screen
-                          summary.push(`- ${r.title} | ${diff === 0 ? 'Today' : 'Tomorrow'}`);
-                      }
-                  });
-                  return summary.length > 0 ? summary.join('\n') : "No reminders due today/tomorrow.";
-              }
-
-              // Helper 2: Checklist (Open status)
-              function buildChecklistSummary() {
-                  let summary = [];
-                  const openChecks = appData.checklists.filter(c => c.status === 'open');
-                  if (openChecks.length === 0) return "No open checklists.";
-
-                  openChecks.slice(0, 3).forEach(c => { // List top 3 open lists
-                      summary.push(`- ${c.title} (${c.items.length} items)`);
-                  });
-
-                  if (openChecks.length > 3) {
-                      summary.push(`... and ${openChecks.length - 3} more open lists.`);
-                  }
-
-                  return summary.join('\n');
-              }
-
-              // Helper 3: Budget (Overview/Cost per day)
-              function buildBudgetSummary() {
-                  let summary = [];
-                  if (appData.budget.length === 0) return "No active budgets to track.";
-
-                  appData.budget.forEach(b => {
-                      const days = daysBetween(b.startDate, b.endDate);
-                      const costPerDay = calculateCostPerDay(b.amount, b.startDate, b.endDate);
-                      // Only show if budget is active
-                      if (days > 0 && costPerDay > 0) {
-                          summary.push(`- ${b.title}: ₹${costPerDay}/day for ${days} days`);
-                      }
-                  });
-                  return summary.length > 0 ? summary.join('\n') : "No active budget overview available.";
-              }
-              
-              // Helper 4: Notes (Summary of recent)
-              function buildNotesSummary() {
-                  let summary = [];
-                  if (appData.notes.length === 0) return "No notes added yet.";
-
-                  // Get the 3 most recent notes
-                  const recentNotes = appData.notes.slice(-3).reverse(); // Get last 3, then reverse to show newest first
-
-                  recentNotes.forEach(n => {
-                      let noteText = n.text;
-                      if(n.isTable) {
-                          noteText = "[Table Note]";
-                      } else {
-                          noteText = (noteText || '').substring(0, 30) + '...'; // Snippet
-                      }
-                      summary.push(`- ${noteText} (${n.createdAt.split(' ')[0]})`); // Show snippet and date part
-                  });
-
-                  if (appData.notes.length > 3) {
-                      summary.push(`... and ${appData.notes.length - 3} older notes.`);
-                  }
-
-                  return summary.join('\n');
-              }
-
-              // --- START OF NOTIFICATION CHANGE ---
-              // This function replaces the old periodic `checkNotifications`
-              function showPersistentSummaryNotification() {
-                // 1. Check global browser permission first
-                if(!(Notification && Notification.permission === 'granted')) {
-                   console.log("Global notification permission not granted. Skipping custom checks.");
-                   return;
-                }
-
-                // --- Start Building Composite Notification Body ---
-                let notificationBody = "";
-                let shouldSendNotification = false; 
-
-                // 1. REMINDERS Summary
-                if (appData.notifReminders) {
-                    notificationBody += "⚠️ REMINDERS (Due Today/Tomorrow):\n";
-                    notificationBody += buildReminderSummary() + "\n\n";
-                    shouldSendNotification = true;
-                }
-
-                // 2. CHECKLIST Summary
-                if (appData.notifChecklist) {
-                    notificationBody += "✒ CHECKLIST (Open):\n";
-                    notificationBody += buildChecklistSummary() + "\n\n";
-                    shouldSendNotification = true;
-                }
-
-                // 3. BUDGET Summary
-                if (appData.notifBudget) {
-                    notificationBody += "💰 BUDGET Overview:\n";
-                    notificationBody += buildBudgetSummary() + "\n\n";
-                    shouldSendNotification = true;
-                }
-
-                // 4. NOTES: Summary
-                if (appData.notifNotes) { 
-                    notificationBody += "📝 NOTES (Recent):\n";
-                    notificationBody += buildNotesSummary() + "\n\n"; 
-                    shouldSendNotification = true;
-                }
-
-                // --- Send Single Comprehensive Notification ---
-                if (shouldSendNotification) {
-                    // We use `new Notification` because this is a LOCAL notification
-                    // from the page, not a PUSH notification from a server.
-                    new Notification("Nothing Reminder - Data Updated", {
-                        body: notificationBody.trim(), // Trim trailing newlines
-                        icon: 'assets/icon.png',
-                        // This makes it persistent, like a system notification
-                        requireInteraction: true,
-                        // This tag ensures we only ever have ONE summary notification.
-                        // Any new one will replace the old one.
-                        tag: NOTIFICATION_TAG 
-                    });
-                }
-              }
-              
-              // This function closes the persistent notification when the user
-              // returns to the app tab.
-              function clearPersistentNotification() {
-                // We must use the Service Worker registration to get and close
-                // notifications, even though we didn't use the SW to create it.
-                // This is the standard way to manage notifications by tag.
-                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-                  navigator.serviceWorker.ready.then(registration => {
-                    registration.getNotifications({ tag: NOTIFICATION_TAG })
-                      .then(notifications => {
-                        notifications.forEach(notification => notification.close());
-                      });
-                  });
-                }
-              }
-              // --- END OF NOTIFICATION CHANGE ---
-
-
-      // ---------- Calculation History Functions ----------
+              // ---------- Calculation History Functions ----------
               function renderHistory() {
                 const list = byId('calculationHistoryList');
                 list.innerHTML = '';
@@ -2258,30 +2191,26 @@
               }
 
               // ---------- Date Difference Calculator Logic ----------
-function calculateDateDifference() {
-  const startStr = byId('dateDiffStart').value;
-  const endStr = byId('dateDiffEnd').value;
-  const resultEl = byId('dateDiffResult');
+              function calculateDateDifference() {
+                const startStr = byId('dateDiffStart').value;
+                const endStr = byId('dateDiffEnd').value;
+                const resultEl = byId('dateDiffResult');
 
-  if (!startStr || !endStr) {
-    resultEl.textContent = 'Please enter both start and end dates.';
-    return;
-  }
+                if (!startStr || !endStr) {
+                  resultEl.textContent = 'Please enter both start and end dates.';
+                  return;
+                }
 
-  const startDate = new Date(startStr);
-  const endDate = new Date(endStr);
+                const startDate = new Date(startStr);
+                const endDate = new Date(endStr);
+                const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-  // Calculate the difference in time
-  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+                const result = `Difference: ${diffDays} day(s).`;
+                resultEl.textContent = result;
 
-  // Convert to days and add 1 to include both start and end dates
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-  const result = `Difference: ${diffDays} day(s).`;
-  resultEl.textContent = result;
-
-  saveHistory(`Date Difference: ${formatDMY(startStr)} to ${formatDMY(endStr)} = ${diffDays} day(s)`, result);
-}
+                saveHistory(`Date Difference: ${formatDMY(startStr)} to ${formatDMY(endStr)} = ${diffDays} day(s)`, result);
+              }
 
               // ---------- Calculator Mode Switcher ----------
               function switchCalculatorMode() {
@@ -2348,15 +2277,6 @@ function calculateDateDifference() {
 
 
               // ---------- Event Listeners ----------
-              
-              // --- START OF NOTIFICATION CHANGE ---
-              // Add listener to clear notification when tab becomes visible
-              document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') {
-                  clearPersistentNotification();
-                }
-              });
-              // --- END OF NOTIFICATION CHANGE ---
 
       // Utilities Listeners
               byId('monthlyCalendarToggle').addEventListener('click', function() {
@@ -2380,13 +2300,11 @@ function calculateDateDifference() {
               // ... all other listeners ...
 
               // Notification Page Listener
-              if (byId('requestPermissionBtn')) { // Add check for element existence
-                byId('requestPermissionBtn').addEventListener('click', requestNotificationPermission);
-                byId('toggleReminders').addEventListener('change', (e) => handleCustomNotifToggle('notifReminders', e));
-                byId('toggleNotes').addEventListener('change', (e) => handleCustomNotifToggle('notifNotes', e));
-                byId('toggleChecklist').addEventListener('change', (e) => handleCustomNotifToggle('notifChecklist', e));
-                byId('toggleBudget').addEventListener('change', (e) => handleCustomNotifToggle('notifBudget', e));
-              }
+              byId('requestPermissionBtn').addEventListener('click', requestNotificationPermission);
+              byId('toggleReminders').addEventListener('change', (e) => handleCustomNotifToggle('notifReminders', e));
+              byId('toggleNotes').addEventListener('change', (e) => handleCustomNotifToggle('notifNotes', e));
+              byId('toggleChecklist').addEventListener('change', (e) => handleCustomNotifToggle('notifChecklist', e));
+              byId('toggleBudget').addEventListener('change', (e) => handleCustomNotifToggle('notifBudget', e));
 
 
               byId('showAddFormBtn').addEventListener('click', function() {
@@ -2463,8 +2381,6 @@ function calculateDateDifference() {
                 byId('saveCheckBtn').textContent = 'Save';
               });
 
-
-
               byId('saveCheckBtn').addEventListener('click', saveCheck);
 
               byId('viewCheckToggle').addEventListener('click', function() {
@@ -2495,73 +2411,20 @@ function calculateDateDifference() {
               renderBudgets();
               renderChecklists();
               renderHistory(); // NEW: Initial render for history
+              renderHome(); // NEW: Initial render for home page
 
               // NEW: Initialize calculator mode
               switchCalculatorMode();
-              
-              // 3. Setup notification UI
-              if ("Notification" in window) {
-                  updateBrowserPermissionUI();
-                  
-                  // --- START OF NOTIFICATION CHANGE ---
-                  // We clear any "stale" notifications from a previous session
-                  // right when the app loads.
-                  clearPersistentNotification();
-                  // --- END OF NOTIFICATION CHANGE ---
-              }
-// --- Static Home Notification (Summary View) ---
-  const STATIC_HOME_KEY = "home_summary_visible";
+              // ... rest of the initial render code ...
 
-  // Create & Show Notification Banner
-  function showHomeStaticNotification() {
-    // Create container
-    const notif = document.createElement("div");
-    notif.id = "homeSummaryBanner";
-    notif.style = `
-      position: fixed; top: 0; left: 0; right: 0;
-      background: #f9fbe7; color: #000;
-      padding: 12px 16px; border-bottom: 2px solid #8bc34a;
-      z-index: 9999; font-size: 14px; font-weight: 500;
-      display: flex; justify-content: space-between; align-items: center;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    `;
+              // 3. Setup notifications and periodic check (removed)
+              // if (("Notification" in window)) {
+              //     updateBrowserPermissionUI();
+              //     checkNotifications();
+              //     // Start the periodic check for notifications (every 5 minutes)
+              //     setInterval(checkNotifications, 5 * 60 * 1000);
+              // }
 
-    // Build summary from localStorage data
-    const data = JSON.parse(localStorage.getItem("smart_reminder_app_v1") || "{}");
-    const reminders = (data.reminders || []).length;
-    const notes = (data.notes || []).length;
-    const budgets = (data.budget || []).length;
-    const checks = (data.checklists || []).filter(c => c.status === "open").length;
-
-    const summaryText = `
-      ⚠️ Reminders: ${reminders} | 📝 Notes: ${notes} |
-      💰 Budgets: ${budgets} | ✒ Open Checklists: ${checks}
-    `;
-
-    const textEl = document.createElement("div");
-    textEl.textContent = summaryText;
-
-    const closeBtn = document.createElement("button");
-    closeBtn.textContent = "✖ Close";
-    closeBtn.style = `
-      background:#8bc34a; color:#fff; border:none;
-      padding:6px 10px; border-radius:6px; cursor:pointer;
-    `;
-    closeBtn.onclick = () => {
-      notif.remove();
-      localStorage.setItem(STATIC_HOME_KEY, "false");
-    };
-
-    notif.appendChild(textEl);
-    notif.appendChild(closeBtn);
-    document.body.appendChild(notif);
-  }
-
-  // Show only if not dismissed
-  window.addEventListener("load", () => {
-    const isVisible = localStorage.getItem(STATIC_HOME_KEY);
-    if (isVisible !== "false") showHomeStaticNotification();
-  });
               // ---------- End Initial Render Code ----------
 
             })();
