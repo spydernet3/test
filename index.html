@@ -1323,7 +1323,7 @@
                     tableHTML += '</tr></table>';
                     text.innerHTML = tableHTML;
                   } else {
-                    text.innerHTML = `<b>${(n.text || '').substring(0, 50)}...</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
+                    text.innerHTML = `<b>${(n.text || '').substring(0, 500)}...</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
                   }
                   left.appendChild(text);
 
