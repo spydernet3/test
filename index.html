@@ -2038,70 +2038,64 @@
 
               // NOTIFICATION CHANGE: This function is now called on page load and on data save (in saveAll).
               // It now sends separate notifications for each category if they have content.
-              function checkNotifications(){
-                // 1. Check global browser permission first
-                if(!(Notification && Notification.permission === 'granted')) {
-                   console.log("Global notification permission not granted. Skipping custom checks.");
-                   return;
-                }
+             // (This is your existing function, just modified)
+function checkNotifications(){
+  // 1. Check global browser permission first
+  // THIS CHECK IS NOW HANDLED BY showNotification()
+  // We can remove this check:
+  // if(!(Notification && Notification.permission === 'granted')) { ... }
 
-                // 1. REMINDERS Summary
-                if (appData.notifReminders) {
-                    const reminderSummary = buildReminderSummary();
-                    // Send notification only if there is something to report (not the default message)
-                    if (reminderSummary !== "No reminders due today/tomorrow.") {
-                        new Notification("Nothing Reminder - ⚠️ Reminders", {
-                            body: reminderSummary,
-                            icon: 'assets/icon.png',
-                            requireInteraction: true,
-                            tag: 'reminders' // Use a tag to replace old reminder notifications
-                        });
-                    }
-                }
+  // 1. REMINDERS Summary
+  if (appData.notifReminders) {
+      const reminderSummary = buildReminderSummary();
+      if (reminderSummary !== "No reminders due today/tomorrow.") {
+          // --- BEFORE ---
+          // new Notification("Nothing Reminder - ⚠️ Reminders", {
+          //     body: reminderSummary, ...
+          // });
 
-                // 2. CHECKLIST Summary
-                if (appData.notifChecklist) {
-                    const checklistSummary = buildChecklistSummary();
-                    // Send notification only if there is something to report
-                    if (checklistSummary !== "No open checklists.") {
-                         new Notification("Nothing Reminder - ✒ Checklists", {
-                            body: checklistSummary,
-                            icon: 'assets/icon.png',
-                            requireInteraction: true,
-                            tag: 'checklists' // Use a tag to replace
-                        });
-                    }
-                }
+          // --- AFTER ---
+          showNotification("Nothing Reminder - ⚠️ Reminders", reminderSummary, 'reminders');
+      }
+  }
 
-                // 3. BUDGET Summary
-                if (appData.notifBudget) {
-                    const budgetSummary = buildBudgetSummary();
-                     // Send notification only if there is something to report
-                    if (budgetSummary !== "No active budgets to track." && budgetSummary !== "No active budget overview available.") {
-                         new Notification("Nothing Reminder - 💰 Budget", {
-                            body: budgetSummary,
-                            icon: 'assets/icon.png',
-                            requireInteraction: true,
-                            tag: 'budget' // Use a tag to replace
-                        });
-                    }
-                }
+  // 2. CHECKLIST Summary
+  if (appData.notifChecklist) {
+      const checklistSummary = buildChecklistSummary();
+      if (checklistSummary !== "No open checklists.") {
+           // --- BEFORE ---
+           // new Notification("Nothing Reminder - ✒ Checklists", { ... });
 
-                // 4. NOTES Summary (Using the new helper)
-                if (appData.notifNotes) {
-                    const notesSummary = buildNotesSummary();
-                     // Send notification only if there is something to report
-                    if (notesSummary !== "No notes added yet.") {
-                        new Notification("Nothing Reminder - 📝 Notes", {
-                            body: notesSummary,
-                            icon: 'assets/icon.png',
-                            requireInteraction: true,
-                            tag: 'notes' // Use a tag to replace
-                        });
-                    }
-                }
-              }
+           // --- AFTER ---
+           showNotification("Nothing Reminder - ✒ Checklists", checklistSummary, 'checklists');
+      }
+  }
 
+  // 3. BUDGET Summary
+  if (appData.notifBudget) {
+      const budgetSummary = buildBudgetSummary();
+      if (budgetSummary !== "No active budgets to track." && budgetSummary !== "No active budget overview available.") {
+           // --- BEFORE ---
+           // new Notification("Nothing Reminder - 💰 Budget", { ... });
+
+           // --- AFTER ---
+           showNotification("Nothing Reminder - 💰 Budget", budgetSummary, 'budget');
+      }
+  }
+
+  // 4. NOTES Summary (Using the new helper)
+  if (appData.notifNotes) {
+      const notesSummary = buildNotesSummary();
+      if (notesSummary !== "No notes added yet.") {
+          // --- BEFORE ---
+          // new Notification("Nothing Reminder - 📝 Notes", { ... });
+
+          // --- AFTER ---
+          showNotification("Nothing Reminder - 📝 Notes", notesSummary, 'notes');
+      }
+  }
+  }
+              
       // ---------- Calculation History Functions ----------
               function renderHistory() {
                 const list = byId('calculationHistoryList');
