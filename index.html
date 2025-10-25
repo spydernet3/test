@@ -2479,9 +2479,15 @@ function calculateDateDifference() {
               // 3. Setup notifications
               // NOTIFICATION CHANGE: Removed periodic check (setInterval).
               // Notifications are now checked on page load (below) and on every data save (in saveAll).
-              if ("Notification" in window) {
-                  updateBrowserPermissionUI();
-                  checkNotifications(); // Check once on page load
+              if ('Notification' in window && Notification.permission === 'granted') {
+  navigator.serviceWorker.getRegistration().then(reg => {
+    reg.showNotification('Local Alert', {
+      body: 'This is triggered locally!',
+      icon: '/assets/icon.png',
+      badge: '/assets/icon.png',
+      data: { url: '/' }
+    });
+  });
               }
               if ('serviceWorker' in navigator) {
                   navigator.serviceWorker.register('service-worker.js');
