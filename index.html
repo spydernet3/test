@@ -2494,12 +2494,14 @@ function calculateDateDifference() {
 
 
 // Wrap your logic in an async function for proper Service Worker usage
-async function checkAndShowSeparateNotifications() {
-    // 1. Check permissions
-    if (!('Notification' in window && Notification.permission === 'grantd')) {
-        console.log("Notification permission not granted.");
-        return;
-    }
+   function checkNotifications(){
+                // 1. Check global browser permission first
+                if(!('Notification' in window && Notification.permission === 'granted')) {
+                   console.log("Global notification permission not granted. Skipping custom checks.");
+                   return;
+                }
+                
+     
 
     // 2. Get the Service Worker Registration (Essential for mobile/PWA background notifications)
     const reg = await navigator.serviceWorker.getRegistration();
@@ -2568,8 +2570,6 @@ async function checkAndShowSeparateNotifications() {
 }
               
 
-// Call the new function where you want the notifications to be checked (e.g., on page load, after saving data)
-checkAndShowSeparateNotifications();
 
 
               
