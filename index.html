@@ -2482,8 +2482,10 @@ function calculateDateDifference() {
                   updateBrowserPermissionUI();
                   checkNotifications(); // Check once on page load
               }
-
-              // ---------- End Initial Render Code ----------
+              if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.register('service-worker.js');
+                }
+                // ---------- End Initial Render Code ----------
 
             })();
     </script>
