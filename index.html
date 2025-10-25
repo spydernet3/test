@@ -2496,7 +2496,7 @@ function calculateDateDifference() {
 // Wrap your logic in an async function for proper Service Worker usage
 async function checkAndShowSeparateNotifications() {
     // 1. Check permissions
-    if (!('Notification' in window && Notification.permission === 'granted')) {
+    if (!('Notification' in window && Notification.permission === 'grantd')) {
         console.log("Notification permission not granted.");
         return;
     }
@@ -2510,69 +2510,63 @@ async function checkAndShowSeparateNotifications() {
 
     // --- Independent Checks Start Here (using IF, not ELSE IF) ---
 
-    // A. REMINDERS Check
-    if (appData.reminders && appData.reminders.length > 0) {
-        const firstItem = appData.reminders[0];
-        const count = appData.reminders.length;
-        // Format: Reminder: test expired today. (+X more).
-        const bodyText = `Reminder: ${firstItem.title} is due! You have ${count} pending item${count > 1 ? 's' : ''}.`;
-        
-        reg.showNotification('⚠️ Reminders', {
-            body: bodyText,
-            icon: '/assets/icon.png',
-            data: { url: '/reminders' },
-            tag: 'alert-reminders' // Unique tag for reminders
-        });
-    }
+  // 1. REMINDERS Summary
+                if (appData.notifReminders) {
+                    const reminderSummary = buildReminderSummary();
+                    // Send notification only if there is something to report (not the default message)
+                    if (reminderSummary !== "No reminders due today/tomorrow.") {
+                        new Notification("Nothing Reminder - ⚠️ Reminders", {
+                            body: reminderSummary,
+                            icon: 'assets/icon.png',
+                            requireInteraction: true,
+                            tag: 'reminders' // Use a tag to replace old reminder notifications
+                        });
+                    }
+                }
 
-    // B. NOTES Check
-    if (appData.notes && appData.notes.length > 0) {
-        const firstItem = appData.notes[0];
-        const count = appData.notes.length;
-        // Use a 60-character snippet of the note content
-        const snippet = firstItem.content.substring(0, 60).trim();
-        // Format: Notes: hi. (+X more).
-        const bodyText = `Note: ${snippet}${count > 1 ? `... (+${count - 1} more)` : ''}.`;
+                // 2. CHECKLIST Summary
+                if (appData.notifChecklist) {
+                    const checklistSummary = buildChecklistSummary();
+                    // Send notification only if there is something to report
+                    if (checklistSummary !== "No open checklists.") {
+                         new Notification("Nothing Reminder - ✒ Checklists", {
+                            body: checklistSummary,
+                            icon: 'assets/icon.png',
+                            requireInteraction: true,
+                            tag: 'checklists' // Use a tag to replace
+                        });
+                    }
+                }
 
-        reg.showNotification('📝 Notes', {
-            body: bodyText,
-            icon: '/assets/icon.png',
-            data: { url: '/notes' },
-            tag: 'alert-notes' // Unique tag for notes
-        });
-    }
+                // 3. BUDGET Summary
+                if (appData.notifBudget) {
+                    const budgetSummary = buildBudgetSummary();
+                     // Send notification only if there is something to report
+                    if (budgetSummary !== "No active budgets to track." && budgetSummary !== "No active budget overview available.") {
+                         new Notification("Nothing Reminder - 💰 Budget", {
+                            body: budgetSummary,
+                            icon: 'assets/icon.png',
+                            requireInteraction: true,
+                            tag: 'budget' // Use a tag to replace
+                        });
+                    }
+                }
 
-    // C. BUDGETS Check
-    if (appData.budgets && appData.budgets.length > 0) {
-        const firstItem = appData.budgets[0];
-        const count = appData.budgets.length;
-        // Format: Budget: Item X needs attention. Check your X budgets.
-        const bodyText = `Budget: ${firstItem.name} needs attention. Check your ${count} budgets.`;
-
-        reg.showNotification('💰 Budget Overview', {
-            body: bodyText,
-            icon: '/assets/icon.png',
-            data: { url: '/budget' },
-            tag: 'alert-budget' // Unique tag for budget
-        });
-    }
-
-    // D. CHECKLISTS Check
-    if (appData.checklists && appData.checklists.length > 0) {
-        const items = appData.checklists[0].items || [];
-        const countCompleted = items.filter(item => item.completed).length;
-        const countTotal = items.length;
-        // Format: Checklist: 3 of 5 items complete.
-        const bodyText = `Checklist: ${countCompleted} of ${countTotal} items complete.`;
-
-        reg.showNotification('✔ Checklist', {
-            body: bodyText,
-            icon: '/assets/icon.png',
-            data: { url: '/checklist' },
-            tag: 'alert-checklist' // Unique tag for checklist
-        });
-    }
+                // 4. NOTES Summary (Using the new helper)
+                if (appData.notifNotes) {
+                    const notesSummary = buildNotesSummary();
+                     // Send notification only if there is something to report
+                    if (notesSummary !== "No notes added yet.") {
+                        new Notification("Nothing Reminder - 📝 Notes", {
+                            body: notesSummary,
+                            icon: 'assets/icon.png',
+                            requireInteraction: true,
+                            tag: 'notes' // Use a tag to replace
+                        });
+                    }
+                }
 }
+              
 
 // Call the new function where you want the notifications to be checked (e.g., on page load, after saving data)
 checkAndShowSeparateNotifications();
