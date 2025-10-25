@@ -2491,13 +2491,61 @@ function calculateDateDifference() {
               // 3. Setup notifications
               // NOTIFICATION CHANGE: Removed periodic check (setInterval).
               // Notifications are now checked on page load (below) and on every data save (in saveAll).
-              if ("Notification" in window) {
-                  updateBrowserPermissionUI();
-                  checkNotifications(); // Check once on page load
-              }
-              if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.register('service-worker.js');
-              }
+            if ('Notification' in window && Notification.permission === 'granted') {
+  
+  // 1. Initialize a default message
+  let notificationBody = 'Everything looks clear! No pending items to show.';
+  let notificationTitle = 'Nothing Alert';
+  
+  // 2. Check content for each section in priority order (Reminder > Note > Budget > Checklist)
+
+  // A. Check REMINDERS (Highest Priority)
+  if (appData.reminders && appData.reminders.length > 0) {
+    const firstItem = appData.reminders[0];
+    const count = appData.reminders.length;
+    notificationTitle = 'Reminder Alert';
+    // Example: Use the title and the count of all reminders
+    notificationBody = `${firstItem.title} is due! You have ${count} pending reminder${count > 1 ? 's' : ''}.`;
+    
+  // B. Check NOTES
+  } else if (appData.notes && appData.notes.length > 0) {
+    const firstItem = appData.notes[0];
+    const count = appData.notes.length;
+    // Assuming 'content' field for a note
+    const snippet = firstItem.content.substring(0, 60).trim();
+    notificationTitle = 'New Note Created';
+    notificationBody = `Note: "${snippet}..." (+${count - 1} more). Tap to view.`;
+
+  // C. Check BUDGETS
+  } else if (appData.budgets && appData.budgets.length > 0) {
+    const firstItem = appData.budgets[0];
+    const count = appData.budgets.length;
+    notificationTitle = 'Budget Update';
+    // Example: Assuming budget items have a 'name' and 'amount'
+    notificationBody = `Budget Item: ${firstItem.name} needs attention. Check your ${count} budgets.`;
+
+  // D. Check CHECKLISTS (Lowest Priority)
+  } else if (appData.checklists && appData.checklists.length > 0) {
+    const items = appData.checklists[0].items || [];
+    const countCompleted = items.filter(item => item.completed).length;
+    const countTotal = items.length;
+    notificationTitle = 'Checklist Status';
+    notificationBody = `Checklist: ${countCompleted} of ${countTotal} items complete. Keep going!`;
+  }
+  
+  // 3. Show the notification with the dynamically determined body
+  navigator.serviceWorker.getRegistration().then(reg => {
+    reg.showNotification(notificationTitle, {
+      // ⬇️ This is the dynamic body ⬇️
+      body: notificationBody, 
+      // ⬆️ This is the dynamic body ⬆️
+      icon: '/assets/icon.png',
+      badge: '/assets/icon.png',
+      data: { url: '/' }
+      // ... your actions array would be here
+    });
+  });
+}
               // ---------- End Initial Render Code ----------
 
             })();
