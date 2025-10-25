@@ -1,58 +1,50 @@
-
-// A list of all cache names
-const CACHE_NAME = 'pwa-cache-v1';
+// The name of your cache must be the same throughout your code.
+const CACHE_NAME = 'pwa-cache-v1'; 
 const ASSETS_TO_CACHE = [
   './', 
   './index.html',
-  // Add other critical assets (CSS, JS, manifest, icons, etc.) here
-  '/assets/icon.png', 
-  '/assets/icon-view.png',
-  '/assets/icon-done.png',
-  '/assets/icon-snooze.png',
-  '/assets/icon-dismiss.png'
+  // Your manifest references icon.png. Add the button icons too!
+  'assets/icon.png', 
+  'assets/icon-view.png',
+  'assets/icon-done.png',
+  'assets/icon-snooze.png',
+  'assets/icon-dismiss.png'
 ];
 
 // ----------------------------------------------------------------------
-// 1. INSTALL Event: Caching Assets
+// 1. INSTALL Event: Caching Assets (Your existing logic)
 // ----------------------------------------------------------------------
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Installing...');
+  console.log('[SW] Installing and Caching...');
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      console.log('[Service Worker] Caching app shell');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
 });
 
 // ----------------------------------------------------------------------
-// 2. ACTIVATE Event: Clean Up Old Caches (Important for PWA updates)
+// 2. ACTIVATE Event: Clean Up Old Caches (Essential for updates)
 // ----------------------------------------------------------------------
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Activating & cleaning up old caches...');
+  console.log('[SW] Activated. Cleaning up old caches.');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
+        // Delete all caches that don't match the current CACHE_NAME
+        cacheNames.filter(name => name !== CACHE_NAME)
+                  .map(name => caches.delete(name))
       );
     })
   );
 });
 
 // ----------------------------------------------------------------------
-// 3. FETCH Event: Serve Cached Assets or Fetch from Network
+// 3. FETCH Event: Serve Cached Assets or Fetch (Your existing logic)
 // ----------------------------------------------------------------------
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(resp => {
-        // Return cached response if found, otherwise fetch from network
-        return resp || fetch(event.request);
-    })
+    caches.match(event.request).then(resp => resp || fetch(event.request))
   );
 });
 
@@ -60,40 +52,24 @@ self.addEventListener('fetch', event => {
 // 4. PUSH Event: Receive and Show Persistent Notification
 // ----------------------------------------------------------------------
 self.addEventListener('push', event => {
-  console.log('[Service Worker] Push received.');
+  console.log('[SW] Push message received. Showing notification.');
 
-  // This is the desired body and action button structure
-  const title = 'Action Required: New Notification!';
+  const title = 'Your Reminder Alert!';
   const options = {
+      // ✅ This is the NEW BODY CONTENT you wanted
       body: 'Tap one of the four options below to proceed.',
-      icon: '/assets/icon.png',
-      badge: '/assets/icon.png', // Shown in the status bar on some platforms
-      data: { url: '/reminder-details' }, // Data to use when the notification is clicked
+      icon: 'assets/icon.png',
+      badge: 'assets/icon.png',
+      data: { url: '/reminder-page' }, // A specific page to open on main click
       actions: [
-          {
-              action: 'view_details',
-              title: 'View Details',
-              icon: '/assets/icon-view.png' 
-          },
-          {
-              action: 'mark_as_done',
-              title: 'Mark Done',
-              icon: '/assets/icon-done.png'
-          },
-          {
-              action: 'snooze',
-              title: 'Snooze (1h)',
-              icon: '/assets/icon-snooze.png'
-          },
-          {
-              action: 'dismiss',
-              title: 'Dismiss',
-              icon: '/assets/icon-dismiss.png'
-          }
+          { action: 'view_details', title: 'View Details', icon: 'assets/icon-view.png' },
+          { action: 'mark_as_done', title: 'Mark Done', icon: 'assets/icon-done.png' },
+          { action: 'snooze', title: 'Snooze (1h)', icon: 'assets/icon-snooze.png' },
+          { action: 'dismiss', title: 'Dismiss', icon: 'assets/icon-dismiss.png' }
       ]
   };
 
-  // Show the notification. event.waitUntil keeps the service worker alive.
+  // self.registration.showNotification is what makes the notification persistent!
   event.waitUntil(
     self.registration.showNotification(title, options)
   );
@@ -103,46 +79,43 @@ self.addEventListener('push', event => {
 // 5. NOTIFICATIONCLICK Event: Handle Button Presses
 // ----------------------------------------------------------------------
 self.addEventListener('notificationclick', event => {
-  const clickedNotification = event.notification;
   const action = event.action; // The 'action' string from the clicked button
-  const urlToOpen = clickedNotification.data.url || '/'; // Default to homepage
+  const urlToOpen = event.notification.data.url || './'; 
 
-  console.log(`[Service Worker] Notification Action: ${action}`);
-  clickedNotification.close(); // Close the notification once clicked
+  event.notification.close(); // Always close the notification on click
 
-  // Handle the custom actions
+  // Skip logic if the user hit 'Dismiss'
   if (action === 'dismiss') {
-    // Dismiss button clicked. Do nothing or log a metric.
-    console.log('Notification dismissed by user.');
+    console.log('User dismissed the notification.');
     return;
   } 
   
-  // Handle other actions (View Details, Mark Done, Snooze)
   event.waitUntil(
     clients.matchAll({ type: 'window' }).then(clientList => {
-      // If the app is already open, focus the window and navigate
+      // 1. Try to focus an existing window/tab
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
+          // If 'View Details' was clicked, navigate the existing window
           if (action === 'view_details') {
              return client.navigate(urlToOpen).then(client => client.focus());
           }
-          // For 'mark_as_done' and 'snooze', we might just focus the app without navigating
+          // Otherwise, just focus the app (for Mark Done / Snooze)
           return client.focus();
         }
       }
 
-      // If the app is not open, open a new window to the appropriate URL
+      // 2. If no window is open, open a new one
       if (action === 'view_details') {
           return clients.openWindow(urlToOpen);
       }
       
-      // For 'mark_as_done' and 'snooze' in background, you'd execute background logic here:
+      // 3. Handle background actions (Mark Done / Snooze) if the app is closed
       if (action === 'mark_as_done') {
-          // e.g., fetch('/api/mark-task-done', { method: 'POST' });
-          console.log('Background task: Marking item as done.');
+          // You would typically send a request to your server here
+          console.log('Executing background action: Mark Done');
       } else if (action === 'snooze') {
-          // e.g., fetch('/api/snooze-reminder', { method: 'POST' });
-          console.log('Background task: Snoozing reminder.');
+          // You would send a request to your server to reset the timer
+          console.log('Executing background action: Snooze');
       }
     })
   );
