@@ -2,8 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Nothing Reminder</title>
+    <link rel="icon" type="image/png" href="assets/icon.png" />
     <link rel="icon" type="image/png" href="assets/icon.png" />
     <link rel="manifest" href="manifest.json">
     <style>
@@ -691,13 +692,18 @@
         <hr />
         <h3>Version Info!</h3>
         <ul>
-          <p>Version 13.4.4</p>
-          <p>Last Updated: 19-Sep-2025</p>
+          <p>Version 13.4.6</p>
+          <p>Last Updated: 24-Sep-2025</p>
           <p>Project Type: Open source</p>
         </ul>
       </div>
 
       <div id="how" class="page hidden">
+        <h3>Install App</h3>
+        <hr />
+        <ul>
+          <li>By Pressing Add to Home Screen Button There You can see Install App to install page as PWA</li>
+        </ul>
         <h3>Reminder!</h3>
         <hr />
         <ul>
@@ -761,9 +767,8 @@
         <h3>Notification!</h3>
         <hr />
         <ul>
-          <li>Notification will showed by default 3 times in a day</li>
+          <li>Notification will showed once page is active</li>
           <li>You will Turn Notification On/Off</li>
-          <li>Morning 08:00 AM & Afternoon 01:00 PM & Evening 06:00 PM</li>
           <li>You can customize notification as per your requirements</li>
         </ul>
         <h3>Offline Mode</h3>
@@ -771,7 +776,7 @@
         <ul>
           <li>
             Step: Download Source Code Zip File in your Device and Extract foder
-            then Open index.html without internet in any broweser
+            then Open index.html without internet in any broweser Note: notifications are not supposed to allowed
           </li>
         </ul>
       </div>
@@ -1000,6 +1005,13 @@
             style="text-decoration: none; color: inherit;"
           >
             <button class="menu-btn" style="width: 180px;">Notepad</button>
+          </a>
+          <a
+            href="https://spydernet3.github.io/Smart-Card/"
+            target="_blank"
+            style="text-decoration: none; color: inherit;"
+          >
+            <button class="menu-btn" style="width: 180px;">Smart Card</button>
           </a>
         </div>
       </div>
@@ -1324,7 +1336,7 @@
                     tableHTML += '</tr></table>';
                     text.innerHTML = tableHTML;
                   } else {
-                    text.innerHTML = `<b>${(n.text || '').substring(0, 500)}...</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
+                    text.innerHTML = `<b>${(n.text || '').substring(0, 50)}...</b><br><small style=\"opacity:0.7\">${n.createdAt || ''}</small>`;
                   }
                   left.appendChild(text);
 
@@ -1984,7 +1996,7 @@
                   appData.reminders.forEach(r => {
                       const diff = daysLeft(r.endDate);
                       if (diff === 0 || diff === 1) { // Only Today or Tomorrow as per home screen
-                          summary.push(`- ${r.title} | ${diff === 0 ? 'Today' : 'Tomorrow'}`);
+                          summary.push(`- ${r.title} | ${diff === 0 & 1 ? 'Today' : 'Tomorrow'}`);
                       }
                   });
                   return summary.length > 0 ? summary.join('\n') : "No reminders due today/tomorrow.";
@@ -2476,12 +2488,19 @@ function calculateDateDifference() {
               switchCalculatorMode();
               // ... rest of the initial render code ...
 
-                  
-              
-                // ---------- End Initial Render Code ----------
+              // 3. Setup notifications
+              // NOTIFICATION CHANGE: Removed periodic check (setInterval).
+              // Notifications are now checked on page load (below) and on every data save (in saveAll).
+              if ("Notification" in window) {
+                  updateBrowserPermissionUI();
+                  checkNotifications(); // Check once on page load
+              }
+              if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.register('service-worker.js');
+              }
+              // ---------- End Initial Render Code ----------
 
             })();
     </script>
   </body>
 </html>
-
