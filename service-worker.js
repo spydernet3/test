@@ -43,6 +43,23 @@ self.addEventListener('push', (event) => {
         self.registration.showNotification(title, options)
     );
 });
+// --- Inside your service-worker.js file ---
+
+self.addEventListener('notificationclick', (event) => {
+  const clickedNotification = event.notification;
+  const action = event.action; // This variable will hold the 'action' value from the clicked button
+
+  clickedNotification.close(); // Close the notification immediately
+
+  if (action === 'view_details') {
+    // Open the main app or a specific page
+    event.waitUntil(clients.openWindow('/details')); 
+  } else if (action === 'mark_as_done') {
+    // Perform an action in the background (e.g., call a server API)
+    console.log('Task marked as done!'); 
+  }
+  // ... handle other actions (snooze, dismiss)
+});
 
 // 2. Listen for the 'notificationclick' event
 // This event handles what happens when the user taps the displayed notification.
