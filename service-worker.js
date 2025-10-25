@@ -1,46 +1,30 @@
-// The name of your cache must be the same throughout your code.
-const CACHE_NAME = 'pwa-cache-v1'; 
+// A list of all cache names
+const CACHE_NAME = 'pwa-cache-v1';
 const ASSETS_TO_CACHE = [
   './', 
   './index.html',
-  // Your manifest references icon.png. Add the button icons too!
-  'assets/icon.png', 
-  'assets/icon-view.png',
-  'assets/icon-done.png',
-  'assets/icon-snooze.png',
-  'assets/icon-dismiss.png'
+  // Ensure all necessary icons for the buttons are listed here!
+  '/assets/icon.png', 
+  '/assets/icon-view.png', 
+  '/assets/icon-done.png',
+  '/assets/icon-snooze.png',
+  '/assets/icon-dismiss.png'
 ];
 
 // ----------------------------------------------------------------------
 // 1. INSTALL Event: Caching Assets (Your existing logic)
 // ----------------------------------------------------------------------
 self.addEventListener('install', event => {
-  console.log('[SW] Installing and Caching...');
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
+      console.log('[Service Worker] Caching app shell');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
 });
 
 // ----------------------------------------------------------------------
-// 2. ACTIVATE Event: Clean Up Old Caches (Essential for updates)
-// ----------------------------------------------------------------------
-self.addEventListener('activate', event => {
-  console.log('[SW] Activated. Cleaning up old caches.');
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        // Delete all caches that don't match the current CACHE_NAME
-        cacheNames.filter(name => name !== CACHE_NAME)
-                  .map(name => caches.delete(name))
-      );
-    })
-  );
-});
-
-// ----------------------------------------------------------------------
-// 3. FETCH Event: Serve Cached Assets or Fetch (Your existing logic)
+// 2. FETCH Event: Serve Cached Assets or Fetch (Your existing logic)
 // ----------------------------------------------------------------------
 self.addEventListener('fetch', event => {
   event.respondWith(
@@ -49,27 +33,58 @@ self.addEventListener('fetch', event => {
 });
 
 // ----------------------------------------------------------------------
+// 3. ACTIVATE Event: Clean Up Old Caches (Best Practice)
+// ----------------------------------------------------------------------
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.filter(cacheName => cacheName !== CACHE_NAME)
+                  .map(cacheName => caches.delete(cacheName))
+      );
+    })
+  );
+});
+
+
+// ----------------------------------------------------------------------
 // 4. PUSH Event: Receive and Show Persistent Notification
 // ----------------------------------------------------------------------
 self.addEventListener('push', event => {
-  console.log('[SW] Push message received. Showing notification.');
+  console.log('[Service Worker] Push received. Showing persistent notification.');
 
-  const title = 'Your Reminder Alert!';
+  const title = 'A Quick Action Is Required!';
   const options = {
-      // ✅ This is the NEW BODY CONTENT you wanted
+      // THIS IS THE NEW BODY CONCEPT YOU WANTED
       body: 'Tap one of the four options below to proceed.',
-      icon: 'assets/icon.png',
-      badge: 'assets/icon.png',
-      data: { url: '/reminder-page' }, // A specific page to open on main click
+      icon: '/assets/icon.png',
+      badge: '/assets/icon.png',
+      data: { url: '/reminder-details' }, // Data to open a specific page on click
       actions: [
-          { action: 'view_details', title: 'View Details', icon: 'assets/icon-view.png' },
-          { action: 'mark_as_done', title: 'Mark Done', icon: 'assets/icon-done.png' },
-          { action: 'snooze', title: 'Snooze (1h)', icon: 'assets/icon-snooze.png' },
-          { action: 'dismiss', title: 'Dismiss', icon: 'assets/icon-dismiss.png' }
+          {
+              action: 'view_details',
+              title: 'View Details',
+              icon: '/assets/icon-view.png' 
+          },
+          {
+              action: 'mark_as_done',
+              title: 'Mark Done',
+              icon: '/assets/icon-done.png'
+          },
+          {
+              action: 'snooze',
+              title: 'Snooze (1h)',
+              icon: '/assets/icon-snooze.png'
+          },
+          {
+              action: 'dismiss',
+              title: 'Dismiss',
+              icon: '/assets/icon-dismiss.png'
+          }
       ]
   };
 
-  // self.registration.showNotification is what makes the notification persistent!
+  // This ensures the notification is shown even when the app is closed.
   event.waitUntil(
     self.registration.showNotification(title, options)
   );
@@ -79,43 +94,38 @@ self.addEventListener('push', event => {
 // 5. NOTIFICATIONCLICK Event: Handle Button Presses
 // ----------------------------------------------------------------------
 self.addEventListener('notificationclick', event => {
-  const action = event.action; // The 'action' string from the clicked button
-  const urlToOpen = event.notification.data.url || './'; 
+  const action = event.action; 
+  const urlToOpen = event.notification.data.url || '/';
 
-  event.notification.close(); // Always close the notification on click
+  event.notification.close(); // Close the notification
 
-  // Skip logic if the user hit 'Dismiss'
+  // Handle specific button clicks
   if (action === 'dismiss') {
-    console.log('User dismissed the notification.');
-    return;
+    return; // Dismissed, nothing more to do
   } 
   
   event.waitUntil(
     clients.matchAll({ type: 'window' }).then(clientList => {
-      // 1. Try to focus an existing window/tab
+      // If the app is open, focus it and/or navigate
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
-          // If 'View Details' was clicked, navigate the existing window
           if (action === 'view_details') {
              return client.navigate(urlToOpen).then(client => client.focus());
           }
-          // Otherwise, just focus the app (for Mark Done / Snooze)
-          return client.focus();
+          return client.focus(); // Focus for 'Mark Done'/'Snooze'
         }
       }
 
-      // 2. If no window is open, open a new one
+      // If the app is closed, open a new window
       if (action === 'view_details') {
           return clients.openWindow(urlToOpen);
       }
       
-      // 3. Handle background actions (Mark Done / Snooze) if the app is closed
+      // Execute background logic for the other buttons
       if (action === 'mark_as_done') {
-          // You would typically send a request to your server here
-          console.log('Executing background action: Mark Done');
+          console.log('Background task: Marking item as done.');
       } else if (action === 'snooze') {
-          // You would send a request to your server to reset the timer
-          console.log('Executing background action: Snooze');
+          console.log('Background task: Snoozing reminder.');
       }
     })
   );
