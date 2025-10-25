@@ -3,8 +3,8 @@
   "short_name": "NothingReminder",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "gray",
-  "theme_color": "gray",
+  "background_color": "var(--bg)",
+  "theme_color": "var(--bg)",
   "icons": [
     {
       "src": "assets/icon.png",
