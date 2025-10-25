@@ -14,61 +14,60 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ------------------------------------------------------------------
-// REQUIRED LOGIC FOR MOBILE BACKGROUND NOTIFICATIONS
-// ------------------------------------------------------------------
-
-// 1. Listen for the 'push' event
-// This event is triggered when your server sends a push message.
-self.addEventListener('push', (event) => {
-    // Attempt to parse the data sent from your server
-    const data = event.data ? event.data.json() : {
-        title: 'New Reminder',
-        body: 'You have a notification!',
-        url: '/'
-    };
-    
-    const title = data.title;
-    const options = {
-        body: data.body,
-        icon: '/assets/icon.png', // CRITICAL: Use your actual icon path
-        badge: '/assets/icon.png',
-        data: {
-            url: data.url // Store the URL to navigate to when the user clicks
-        }
-    };
-
-    // Keep the service worker alive until the notification is displayed
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
-});
 // --- Inside your service-worker.js file ---
 
-self.addEventListener('notificationclick', (event) => {
-  const clickedNotification = event.notification;
-  const action = event.action; // This variable will hold the 'action' value from the clicked button
+// 1. Listen for the 'push' event sent from your server
+self.addEventListener('push', (event) => {
+    // If your server sends a payload, you can use event.data.json()
+    // For this example, we will define the notification options directly here
+    const title = 'Your Reminder Is Due!';
+    
+    // This is the body concept change you requested
+    const notificationOptions = {
+        body: 'Tap one of the four options below to proceed.',
+        icon: '/assets/icon.png',
+        badge: '/assets/icon.png',
+        data: { url: '/reminder-page-id' }, // Custom data to open a specific page
+        actions: [
+            {
+                action: 'view_details',
+                title: 'View Details',
+                icon: '/assets/icon-view.png'
+            },
+            {
+                action: 'mark_as_done',
+                title: 'Mark Done',
+                icon: '/assets/icon-done.png'
+            },
+            {
+                action: 'snooze',
+                title: 'Snooze (1h)',
+                icon: '/assets/icon-snooze.png'
+            },
+            {
+                action: 'dismiss',
+                title: 'Dismiss',
+                icon: '/assets/icon-dismiss.png'
+            }
+        ]
+    };
 
-  clickedNotification.close(); // Close the notification immediately
-
-  if (action === 'view_details') {
-    // Open the main app or a specific page
-    event.waitUntil(clients.openWindow('/details')); 
-  } else if (action === 'mark_as_done') {
-    // Perform an action in the background (e.g., call a server API)
-    console.log('Task marked as done!'); 
-  }
-  // ... handle other actions (snooze, dismiss)
+    // The event.waitUntil ensures the Service Worker stays alive until 
+    // the notification is displayed.
+    event.waitUntil(
+        self.registration.showNotification(title, notificationOptions)
+    );
 });
 
-// 2. Listen for the 'notificationclick' event
-// This event handles what happens when the user taps the displayed notification.
+// 2. Ensure your action handling is still in place (from the previous step)
 self.addEventListener('notificationclick', (event) => {
-    event.notification.close(); // Close the notification immediately
+  const clickedNotification = event.notification;
+  const action = event.action; 
+  
+  // ... (existing action handling code goes here)
+});
 
-    const urlToOpen = event.notification.data.url || '/';
 
-    event.waitUntil(
         // Look through all open windows/tabs to see if the PWA is running
         clients.matchAll({ type: 'window' }).then((clientList) => {
             for (const client of clientList) {
