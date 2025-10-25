@@ -2494,81 +2494,85 @@ function calculateDateDifference() {
 
 
 // Wrap your logic in an async function for proper Service Worker usage
-   function checkNotifications(){
-                // 1. Check global browser permission first
-                if(!('Notification' in window && Notification.permission === 'granted')) {
-                   console.log("Global notification permission not granted. Skipping custom checks.");
-                   return;
-                }
-                
-     
+// Function needs to be declared async
+async function checkAndShowAllActiveNotifications() {
+    // 1. Check permissions
+    if (!('Notification' in window && Notification.permission === 'granted')) {
+        console.log("Notification permission not granted.");
+        return;
+    }
 
-    // 2. Get the Service Worker Registration (Essential for mobile/PWA background notifications)
+    // 2. Get Service Worker Registration
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) {
         console.error("Service Worker registration not found. Cannot send notifications.");
         return;
     }
 
-    // --- Independent Checks Start Here (using IF, not ELSE IF) ---
+    // --- A. REMINDERS Check (e.g., Reminder: test expired today. (+7 more)) ---
+    if (appData.reminders && appData.reminders.length > 0) {
+        const firstItem = appData.reminders[0];
+        const count = appData.reminders.length;
+        
+        // Use the exact content from the first item and mention the rest
+        const bodyText = `Reminder: ${firstItem.title}. ${count > 1 ? `(+${count - 1} more).` : ''}`;
+        
+        reg.showNotification('⚠️ Reminders', {
+            body: bodyText,
+            icon: '/assets/icon.png',
+            tag: 'alert-reminders' // Unique tag
+        });
+    }
 
-  // 1. REMINDERS Summary
-                if (appData.notifReminders) {
-                    const reminderSummary = buildReminderSummary();
-                    // Send notification only if there is something to report (not the default message)
-                    if (reminderSummary !== "No reminders due today/tomorrow.") {
-                        new Notification("Nothing Reminder - ⚠️ Reminders", {
-                            body: reminderSummary,
-                            icon: 'assets/icon.png',
-                            requireInteraction: true,
-                            tag: 'reminders' // Use a tag to replace old reminder notifications
-                        });
-                    }
-                }
+    // --- B. NOTES Check (e.g., Notes: hi. (+X more)) ---
+    if (appData.notes && appData.notes.length > 0) {
+        const firstItem = appData.notes[0];
+        const count = appData.notes.length;
+        // Assuming 'content' field for a note
+        const snippet = firstItem.content.substring(0, 50).trim();
 
-                // 2. CHECKLIST Summary
-                if (appData.notifChecklist) {
-                    const checklistSummary = buildChecklistSummary();
-                    // Send notification only if there is something to report
-                    if (checklistSummary !== "No open checklists.") {
-                         new Notification("Nothing Reminder - ✒ Checklists", {
-                            body: checklistSummary,
-                            icon: 'assets/icon.png',
-                            requireInteraction: true,
-                            tag: 'checklists' // Use a tag to replace
-                        });
-                    }
-                }
+        const bodyText = `Note: ${snippet}. ${count > 1 ? `(+${count - 1} more).` : ''}`;
+        
+        reg.showNotification('📝 Notes', {
+            body: bodyText,
+            icon: '/assets/icon.png',
+            tag: 'alert-notes' // Unique tag
+        });
+    }
 
-                // 3. BUDGET Summary
-                if (appData.notifBudget) {
-                    const budgetSummary = buildBudgetSummary();
-                     // Send notification only if there is something to report
-                    if (budgetSummary !== "No active budgets to track." && budgetSummary !== "No active budget overview available.") {
-                         new Notification("Nothing Reminder - 💰 Budget", {
-                            body: budgetSummary,
-                            icon: 'assets/icon.png',
-                            requireInteraction: true,
-                            tag: 'budget' // Use a tag to replace
-                        });
-                    }
-                }
+    // --- C. BUDGETS Check (Only if content exists) ---
+    if (appData.budgets && appData.budgets.length > 0) {
+        const firstItem = appData.budgets[0];
+        const count = appData.budgets.length;
+        // Format: Budget: Item X needs attention.
+        const bodyText = `Budget: ${firstItem.name} needs attention. ${count > 1 ? `(${count} active budgets).` : ''}`;
 
-                // 4. NOTES Summary (Using the new helper)
-                if (appData.notifNotes) {
-                    const notesSummary = buildNotesSummary();
-                     // Send notification only if there is something to report
-                    if (notesSummary !== "No notes added yet.") {
-                        new Notification("Nothing Reminder - 📝 Notes", {
-                            body: notesSummary,
-                            icon: 'assets/icon.png',
-                            requireInteraction: true,
-                            tag: 'notes' // Use a tag to replace
-                        });
-                    }
-                }
+        reg.showNotification('💰 Budget Overview', {
+            body: bodyText,
+            icon: '/assets/icon.png',
+            tag: 'alert-budget' // Unique tag
+        });
+    }
+
+    // --- D. CHECKLISTS Check (Only if content exists) ---
+    if (appData.checklists && appData.checklists.length > 0) {
+        const items = appData.checklists[0].items || [];
+        const countCompleted = items.filter(item => item.completed).length;
+        const countTotal = items.length;
+        
+        // Format: Checklist: 3 of 5 items complete.
+        const bodyText = `Checklist: ${countCompleted} of ${countTotal} items complete.`;
+
+        reg.showNotification('✔ Checklist', {
+            body: bodyText,
+            icon: '/assets/icon.png',
+            tag: 'alert-checklist' // Unique tag
+        });
+    }
 }
-              
+
+// Ensure you call this function on page load and whenever data is saved:
+// checkAndShowAllActiveNotifications();
 
 
 
