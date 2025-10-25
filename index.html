@@ -2492,84 +2492,93 @@ function calculateDateDifference() {
               // NOTIFICATION CHANGE: Removed periodic check (setInterval).
               // Notifications are now checked on page load (below) and on every data save (in saveAll).
 
+
 // Wrap your logic in an async function for proper Service Worker usage
-async function checkAndShowPrioritizedNotification() {
+async function checkAndShowSeparateNotifications() {
     // 1. Check permissions
     if (!('Notification' in window && Notification.permission === 'granted')) {
         console.log("Notification permission not granted.");
         return;
     }
 
-    // 2. Get the Service Worker Registration (Critical for mobile/PWA background notifications)
+    // 2. Get the Service Worker Registration (Essential for mobile/PWA background notifications)
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) {
         console.error("Service Worker registration not found. Cannot send notifications.");
         return;
     }
 
-    // 3. Initialize default values
-    let notificationBody = 'Everything looks clear! No pending items to show.';
-    let notificationTitle = 'Nothing Alert';
-    let hasContent = false;
-    
-    // Check content for each section in the desired cascading priority:
-    
-    // A. Check REMINDERS (Highest Priority)
+    // --- Independent Checks Start Here (using IF, not ELSE IF) ---
+
+    // A. REMINDERS Check
     if (appData.reminders && appData.reminders.length > 0) {
         const firstItem = appData.reminders[0];
         const count = appData.reminders.length;
-        notificationTitle = '⚠️ Reminder Alert';
-        // Format: Reminder: test due is today. (+X more).
-        notificationBody = `Reminder: ${firstItem.title} is due! You have ${count} pending item${count > 1 ? 's' : ''}.`;
-        hasContent = true;
+        // Format: Reminder: test expired today. (+X more).
+        const bodyText = `Reminder: ${firstItem.title} is due! You have ${count} pending item${count > 1 ? 's' : ''}.`;
+        
+        reg.showNotification('⚠️ Reminders', {
+            body: bodyText,
+            icon: '/assets/icon.png',
+            data: { url: '/reminders' },
+            tag: 'alert-reminders' // Unique tag for reminders
+        });
+    }
 
-    // B. Check NOTES
-    } else if (appData.notes && appData.notes.length > 0) {
+    // B. NOTES Check
+    if (appData.notes && appData.notes.length > 0) {
         const firstItem = appData.notes[0];
         const count = appData.notes.length;
         // Use a 60-character snippet of the note content
         const snippet = firstItem.content.substring(0, 60).trim();
-        notificationTitle = '📝 New Note Found';
         // Format: Notes: hi. (+X more).
-        notificationBody = `Note: ${snippet}${count > 1 ? `... (+${count - 1} more)` : ''}.`;
-        hasContent = true;
+        const bodyText = `Note: ${snippet}${count > 1 ? `... (+${count - 1} more)` : ''}.`;
 
-    // C. Check BUDGETS
-    } else if (appData.budgets && appData.budgets.length > 0) {
+        reg.showNotification('📝 Notes', {
+            body: bodyText,
+            icon: '/assets/icon.png',
+            data: { url: '/notes' },
+            tag: 'alert-notes' // Unique tag for notes
+        });
+    }
+
+    // C. BUDGETS Check
+    if (appData.budgets && appData.budgets.length > 0) {
         const firstItem = appData.budgets[0];
         const count = appData.budgets.length;
-        notificationTitle = '💰 Budget Watch';
         // Format: Budget: Item X needs attention. Check your X budgets.
-        notificationBody = `Budget: ${firstItem.name} needs attention. Check your ${count} budgets.`;
-        hasContent = true;
+        const bodyText = `Budget: ${firstItem.name} needs attention. Check your ${count} budgets.`;
 
-    // D. Check CHECKLISTS (Lowest Priority)
-    } else if (appData.checklists && appData.checklists.length > 0) {
+        reg.showNotification('💰 Budget Overview', {
+            body: bodyText,
+            icon: '/assets/icon.png',
+            data: { url: '/budget' },
+            tag: 'alert-budget' // Unique tag for budget
+        });
+    }
+
+    // D. CHECKLISTS Check
+    if (appData.checklists && appData.checklists.length > 0) {
         const items = appData.checklists[0].items || [];
         const countCompleted = items.filter(item => item.completed).length;
         const countTotal = items.length;
-        notificationTitle = '✔ Task Status';
         // Format: Checklist: 3 of 5 items complete.
-        notificationBody = `Checklist: ${countCompleted} of ${countTotal} items complete.`;
-        hasContent = true;
-    }
+        const bodyText = `Checklist: ${countCompleted} of ${countTotal} items complete.`;
 
-    // 4. Show the notification if content was found (or show the default "clear" message)
-    if (hasContent || notificationTitle === 'Nothing Alert') {
-        reg.showNotification(notificationTitle, {
-            body: notificationBody, 
+        reg.showNotification('✔ Checklist', {
+            body: bodyText,
             icon: '/assets/icon.png',
-            badge: '/assets/icon.png',
-            tag: 'priority-alert', // Use a single tag to replace the previously shown alert
-            data: { url: '/' }
-            // ... your actions array would be here
+            data: { url: '/checklist' },
+            tag: 'alert-checklist' // Unique tag for checklist
         });
     }
 }
 
-// Call the new function where you previously had the inline notification code
-// e.g., on page load, and inside your data saving function (saveAll)
-checkAndShowPrioritizedNotification();
+// Call the new function where you want the notifications to be checked (e.g., on page load, after saving data)
+checkAndShowSeparateNotifications();
+
+
+              
 
               
               // ---------- End Initial Render Code ----------
